@@ -36,11 +36,12 @@ body:
     attributes:
       label: Category
       options:
-        - Cloning pipeline
-        - Asset extraction
-        - Component generation
+        - Website
+        - Chrome extension
+        - macOS app
+        - Supabase sync
+        - Privacy or safety
         - Documentation
-        - Developer experience
         - Other
 
   - type: textarea

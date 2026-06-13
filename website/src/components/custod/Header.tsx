@@ -3,15 +3,18 @@
 import { Menu, X } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { StatusDot } from "@/components/custod/StatusLamp";
 import { NAV_LINKS } from "@/lib/custod-content";
 import { cn } from "@/lib/utils";
 
 export function Header() {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
   const [showFloatingCta, setShowFloatingCta] = useState(false);
 
   useEffect(() => {
     const onScroll = () => {
+      setScrolled(window.scrollY > 48);
       const downloadEl = document.getElementById("download-button");
       if (!downloadEl) return;
       const rect = downloadEl.getBoundingClientRect();
@@ -25,12 +28,20 @@ export function Header() {
 
   return (
     <>
-      <header className="absolute inset-x-0 top-0 z-50 px-5 text-white md:px-8">
-        <div className="mx-auto flex max-w-6xl items-center justify-between py-5">
+      <header
+        className={cn(
+          "fixed inset-x-0 top-0 z-50 px-5 transition-all duration-300 md:px-8",
+          scrolled
+            ? "border-b border-border bg-background/90 py-3 shadow-sm backdrop-blur-md"
+            : "bg-background/60 py-5 backdrop-blur-sm",
+        )}
+      >
+        <div className="mx-auto flex max-w-6xl items-center justify-between">
           <Link
             href="/"
-            className="font-heading text-2xl font-semibold tracking-tight text-white"
+            className="flex items-center gap-2.5 font-heading text-2xl text-foreground"
           >
+            <StatusDot status="green" />
             Custod
           </Link>
 
@@ -39,31 +50,25 @@ export function Header() {
               <Link
                 key={link.label}
                 href={link.href}
-                className="text-sm font-medium text-white/85 transition-colors hover:text-white"
+                className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
               >
                 {link.label}
               </Link>
             ))}
           </nav>
 
-          <div className="hidden items-center gap-3 md:flex">
+          <div className="hidden md:block">
             <Link
-              href="/login"
-              className="rounded-lg border border-white/20 bg-white/10 px-4 py-2 text-sm font-medium text-white backdrop-blur-sm transition hover:scale-[1.02] hover:bg-white/15"
+              href="mailto:hello@custod.app?subject=Custod%20Waitlist"
+              className="custod-primary-button rounded-full px-5 py-2.5 text-sm font-semibold transition hover:scale-[1.03] active:scale-[0.97]"
             >
-              Log in
-            </Link>
-            <Link
-              href="/download"
-              className="custod-primary-button rounded-lg px-4 py-2.5 text-sm font-medium text-white transition hover:scale-[1.03] active:scale-[0.97]"
-            >
-              Add to Chrome
+              Join waitlist
             </Link>
           </div>
 
           <button
             type="button"
-            className="inline-flex items-center gap-2 rounded-lg border border-white/20 px-3 py-2 text-sm md:hidden"
+            className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-2 text-sm text-foreground md:hidden"
             onClick={() => setMenuOpen(true)}
             aria-label="Open menu"
           >
@@ -74,15 +79,18 @@ export function Header() {
 
       <div
         className={cn(
-          "fixed right-5 top-3 z-50 transition-opacity duration-300 md:right-8",
-          showFloatingCta ? "opacity-100" : "pointer-events-none opacity-0",
+          "fixed right-5 top-3 z-50 transition-all duration-300 md:right-8",
+          showFloatingCta
+            ? "translate-y-0 opacity-100"
+            : "pointer-events-none -translate-y-2 opacity-0",
         )}
       >
         <Link
-          href="/download"
-          className="custod-primary-button rounded-lg px-4 py-2.5 text-sm font-medium text-white shadow-lg"
+          href="mailto:hello@custod.app?subject=Custod%20Waitlist"
+          className="custod-primary-button inline-flex items-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold shadow-md"
         >
-          Add to Chrome
+          <StatusDot status="green" />
+          Join waitlist
         </Link>
       </div>
 
@@ -90,13 +98,13 @@ export function Header() {
         <div className="fixed inset-0 z-[60] md:hidden">
           <button
             type="button"
-            className="absolute inset-0 bg-black/40"
+            className="absolute inset-0 bg-custod-brown/40 backdrop-blur-sm"
             aria-label="Close menu"
             onClick={() => setMenuOpen(false)}
           />
-          <div className="absolute inset-x-0 bottom-0 max-h-[75dvh] rounded-t-3xl bg-white p-6 text-[#0f172a]">
+          <div className="absolute inset-x-0 bottom-0 max-h-[75dvh] rounded-t-[2rem] border-t border-border bg-card p-6 text-foreground shadow-2xl">
             <div className="mb-6 flex items-center justify-between">
-              <span className="font-semibold">Menu</span>
+              <span className="font-heading text-xl text-foreground">Custod</span>
               <button
                 type="button"
                 onClick={() => setMenuOpen(false)}
@@ -105,27 +113,24 @@ export function Header() {
                 <X className="size-5" />
               </button>
             </div>
-            <nav className="flex flex-col gap-4">
+            <nav className="flex flex-col gap-1">
               {NAV_LINKS.map((link) => (
                 <Link
                   key={link.label}
                   href={link.href}
-                  className="text-lg font-medium"
+                  className="rounded-xl px-3 py-3 text-lg font-medium transition hover:bg-secondary"
                   onClick={() => setMenuOpen(false)}
                 >
                   {link.label}
                 </Link>
               ))}
-              <Link href="/login" className="text-lg font-medium" onClick={() => setMenuOpen(false)}>
-                Log in
-              </Link>
             </nav>
             <Link
-              href="/download"
-              className="custod-primary-button mt-8 block w-full rounded-lg px-4 py-3 text-center text-sm font-medium text-white"
+              href="mailto:hello@custod.app?subject=Custod%20Waitlist"
+              className="custod-primary-button mt-6 block w-full rounded-full px-4 py-3 text-center text-sm font-semibold"
               onClick={() => setMenuOpen(false)}
             >
-              Add to Chrome
+              Join waitlist
             </Link>
           </div>
         </div>

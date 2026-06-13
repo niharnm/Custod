@@ -1,15 +1,28 @@
-# Custod — Design Tokens
+# Custod — Design Tokens (Slidesgo Workshop Theme)
 
-## Status colors
-- Green: `#22C55E` (0–40)
-- Yellow: `#EAB308` (41–70)
-- Red: `#EF4444` (71–100)
+Based on **Youth Mental Health First Aid Workshop** by Slidesgo.
 
-## Brand
-- Primary: `#0f766e`
-- Secondary background: `#e8f0ec`
-- Muted text: `#6b7280`
-- Heading gradient: `#0f172a` → `#475569`
+## Palette
+| Token | Hex | Usage |
+|-------|-----|-------|
+| Brown | `#332c27` | Headings, body text, primary button label |
+| Rose | `#e8b0af` | Accent, dividers, section tints |
+| Cream | `#f9f6f1` | Page background |
+| Taupe | `#d8bca7` | Borders, muted UI |
+| Amber | `#eab56f` | Primary CTA, highlights |
+| White | `#ffffff` | Cards, surfaces |
 
-## Hero
-- Guardian gradient: deep slate → teal → black
+## Status (harmonized)
+- Green: `#6b9e72`
+- Yellow: `#eab56f` (matches amber)
+- Red: `#d48483` (dusty rose-red)
+
+## Typography
+- **Yusei Magic** — headings (`font-heading`)
+- **Hind** — body UI (`font-sans`)
+
+## Visual language
+- Warm cream backgrounds with organic rose/amber blobs
+- Rounded-full buttons and cards
+- Amber accent bars under section titles
+- Soft workshop / mental-health presentation aesthetic

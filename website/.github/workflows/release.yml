@@ -1,0 +1,40 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  extension:
+    name: Build Chrome extension
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Build extension
+        working-directory: extension
+        env:
+          VITE_WEB_APP_URL: ${{ vars.CUSTOD_APP_URL }}
+        run: |
+          npm install
+          npm run build
+
+      - name: Zip extension
+        working-directory: extension
+        run: |
+          cd dist
+          zip -r ../custod-extension.zip .
+
+      - name: Attach to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: extension/custod-extension.zip

@@ -8,10 +8,10 @@ import type {
 } from "@/types/custod";
 
 export const NAV_LINKS = [
-  { label: "How It Works", href: "#how-it-works" },
-  { label: "Components", href: "#components" },
-  { label: "Privacy", href: "#privacy" },
-  { label: "FAQ", href: "#faq" },
+  { label: "How It Works", href: "/#how-it-works" },
+  { label: "Components", href: "/#components" },
+  { label: "Privacy", href: "/privacy" },
+  { label: "FAQ", href: "/#faq" },
 ] as const;
 
 export const BRAND = {
@@ -249,16 +249,17 @@ export const FOOTER_GROUPS: FooterLinkGroup[] = [
   {
     title: "Product",
     links: [
-      { label: "How It Works", href: "#how-it-works" },
-      { label: "Components", href: "#components" },
-      { label: "Signals", href: "#signals" },
+      { label: "How It Works", href: "/#how-it-works" },
+      { label: "Components", href: "/#components" },
+      { label: "Signals", href: "/#signals" },
     ],
   },
   {
     title: "Trust",
     links: [
-      { label: "Privacy", href: "#privacy" },
-      { label: "FAQ", href: "#faq" },
+      { label: "Privacy Policy", href: "/privacy" },
+      { label: "Terms of Service", href: "/terms" },
+      { label: "FAQ", href: "/#faq" },
     ],
   },
   {

@@ -2,7 +2,7 @@
 
 import { ChevronDown, Shield } from "lucide-react";
 import { useState } from "react";
-import { SectionHeading } from "@/components/custod/SectionPrimitives";
+import { SectionHeading, SectionShell } from "@/components/custod/SectionPrimitives";
 import { FAQ_ITEMS, PRIVACY_PRINCIPLES } from "@/lib/custod-content";
 import { cn } from "@/lib/utils";
 
@@ -10,7 +10,7 @@ export function PrivacyFaqSection() {
   const [openIndex, setOpenIndex] = useState<number | null>(0);
 
   return (
-    <section id="privacy" className="scroll-mt-24 px-5 py-12 md:px-8 md:py-16 lg:py-24">
+    <SectionShell id="privacy">
       <SectionHeading
         title="Privacy by design"
         subtitle="Custod minimizes data exposure at every layer. It watches patterns — not your private content."
@@ -19,15 +19,14 @@ export function PrivacyFaqSection() {
 
       <div className="mx-auto mb-16 grid max-w-6xl gap-4 md:grid-cols-2">
         {PRIVACY_PRINCIPLES.map((principle) => (
-          <div
-            key={principle.title}
-            className="rounded-2xl border border-[#E2E8F0] bg-white p-5 shadow-sm"
-          >
-            <div className="mb-2 flex items-center gap-2">
-              <Shield className="size-4 text-custod-primary" />
-              <h3 className="font-semibold text-[#0f172a]">{principle.title}</h3>
+          <div key={principle.title} className="custod-card p-5">
+              <div className="mb-2 flex items-center gap-2">
+              <div className="flex size-8 items-center justify-center rounded-xl bg-accent/40">
+                <Shield className="size-4 text-foreground" />
+              </div>
+              <h3 className="font-semibold text-foreground">{principle.title}</h3>
             </div>
-            <p className="text-sm leading-relaxed text-custod-muted">
+            <p className="text-sm leading-relaxed text-muted-foreground">
               {principle.description}
             </p>
           </div>
@@ -40,7 +39,7 @@ export function PrivacyFaqSection() {
           className="mb-10 lg:mb-14"
         />
 
-        <div className="mx-auto max-w-3xl divide-y divide-[#E2E8F0]">
+        <div className="custod-card mx-auto max-w-3xl divide-y divide-border px-2 md:px-6">
           {FAQ_ITEMS.map((item, index) => {
             const open = openIndex === index;
             return (
@@ -51,13 +50,13 @@ export function PrivacyFaqSection() {
                   onClick={() => setOpenIndex(open ? null : index)}
                   aria-expanded={open}
                 >
-                  <span className="font-inter text-lg font-medium text-[#0f172a] lg:text-xl">
+                  <span className="font-inter text-lg font-medium text-foreground lg:text-xl">
                     {item.question}
                   </span>
                   <ChevronDown
                     className={cn(
-                      "mt-1 size-5 shrink-0 text-custod-muted transition-transform duration-200",
-                      open && "rotate-180",
+                      "mt-1 size-5 shrink-0 text-muted-foreground transition-transform duration-200",
+                      open && "rotate-180 text-primary",
                     )}
                   />
                 </button>
@@ -70,7 +69,7 @@ export function PrivacyFaqSection() {
                   )}
                 >
                   <div className="overflow-hidden">
-                    <p className="pr-8 text-sm leading-relaxed text-custod-muted md:text-base">
+                    <p className="pr-8 text-sm leading-relaxed text-muted-foreground md:text-base">
                       {item.answer}
                     </p>
                   </div>
@@ -80,6 +79,6 @@ export function PrivacyFaqSection() {
           })}
         </div>
       </div>
-    </section>
+    </SectionShell>
   );
 }

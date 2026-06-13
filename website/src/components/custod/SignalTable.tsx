@@ -6,25 +6,25 @@ interface SignalTableProps {
 
 export function SignalTable({ rows }: SignalTableProps) {
   return (
-    <div className="overflow-hidden rounded-2xl border border-[#E2E8F0]">
+    <div className="custod-card overflow-hidden">
       <div className="overflow-x-auto">
         <table className="w-full min-w-[480px] text-left text-sm">
           <thead>
-            <tr className="border-b border-[#E2E8F0] bg-[#F8FAFC]">
-              <th className="px-5 py-4 font-semibold text-[#0f172a]">Source</th>
-              <th className="px-5 py-4 font-semibold text-[#0f172a]">Signals</th>
+            <tr className="border-b border-border bg-muted/60">
+              <th className="px-5 py-4 font-semibold text-foreground">Source</th>
+              <th className="px-5 py-4 font-semibold text-foreground">Signals</th>
             </tr>
           </thead>
           <tbody>
             {rows.map((row, index) => (
               <tr
                 key={row.source}
-                className={index % 2 === 0 ? "bg-white" : "bg-[#F8FAFC]/50"}
+                className={index % 2 === 0 ? "bg-card" : "bg-muted/30"}
               >
-                <td className="px-5 py-4 align-top font-medium text-custod-primary">
+                <td className="px-5 py-4 align-top font-medium text-primary">
                   {row.source}
                 </td>
-                <td className="px-5 py-4 text-custod-muted">{row.signals}</td>
+                <td className="px-5 py-4 text-muted-foreground">{row.signals}</td>
               </tr>
             ))}
           </tbody>

@@ -24,11 +24,11 @@ export function SyncDiagram() {
             initial={{ opacity: 0, y: 16 }}
             animate={inView ? { opacity: 1, y: 0 } : { opacity: 0, y: 16 }}
             transition={{ delay: index * 0.08 }}
-            className="custod-card-gradient flex flex-col items-center rounded-2xl border border-[#E2E8F0] p-4 text-center"
+            className="custod-card-gradient custod-card flex flex-col items-center p-4 text-center"
           >
-            <client.icon className="mb-2 size-6 text-custod-primary" />
-            <span className="text-sm font-medium">{client.label}</span>
-            <span className="mt-1 text-xs text-custod-muted">Every 5 min</span>
+            <client.icon className="mb-2 size-6 text-primary" />
+            <span className="text-sm font-medium text-foreground">{client.label}</span>
+            <span className="mt-1 text-xs text-muted-foreground">Every 5 min</span>
           </motion.div>
         ))}
       </div>
@@ -37,19 +37,21 @@ export function SyncDiagram() {
         initial={{ scaleY: 0 }}
         animate={inView ? { scaleY: 1 } : { scaleY: 0 }}
         transition={{ delay: 0.3, duration: 0.4 }}
-        className="mx-auto my-2 h-8 w-px origin-top bg-custod-primary/40"
+        className="mx-auto my-2 h-8 w-px origin-top bg-primary/30"
       />
 
       <motion.div
         initial={{ opacity: 0, y: 16 }}
         animate={inView ? { opacity: 1, y: 0 } : { opacity: 0, y: 16 }}
         transition={{ delay: 0.35 }}
-        className="custod-card-gradient mx-auto flex max-w-md items-center gap-4 rounded-2xl border border-[#E2E8F0] p-5"
+        className="custod-card-gradient custod-card mx-auto flex max-w-md items-center gap-4 p-5"
       >
-        <Database className="size-8 shrink-0 text-custod-primary" />
+        <div className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-accent/35">
+          <Database className="size-6 text-foreground" />
+        </div>
         <div>
-          <p className="font-medium">Supabase Hub</p>
-          <p className="text-sm text-custod-muted">
+          <p className="font-medium text-foreground">Supabase Hub</p>
+          <p className="text-sm text-muted-foreground">
             Postgres + Realtime sync across all devices
           </p>
         </div>
@@ -59,19 +61,21 @@ export function SyncDiagram() {
         initial={{ scaleY: 0 }}
         animate={inView ? { scaleY: 1 } : { scaleY: 0 }}
         transition={{ delay: 0.45, duration: 0.4 }}
-        className="mx-auto my-2 h-8 w-px origin-top bg-custod-primary/40"
+        className="mx-auto my-2 h-8 w-px origin-top bg-primary/30"
       />
 
       <motion.div
         initial={{ opacity: 0, y: 16 }}
         animate={inView ? { opacity: 1, y: 0 } : { opacity: 0, y: 16 }}
         transition={{ delay: 0.5 }}
-        className="custod-card-gradient mx-auto flex max-w-md items-center gap-4 rounded-2xl border border-[#E2E8F0] p-5"
+        className="custod-card-gradient custod-card mx-auto flex max-w-md items-center gap-4 p-5"
       >
-        <Zap className="size-8 shrink-0 text-custod-status-yellow" />
+        <div className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-primary/25">
+          <Zap className="size-6 text-foreground" />
+        </div>
         <div>
-          <p className="font-medium">ML Edge Function</p>
-          <p className="text-sm text-custod-muted">
+          <p className="font-medium text-foreground">ML Edge Function</p>
+          <p className="text-sm text-muted-foreground">
             TensorFlow Lite · 20-feature vector · score 0–100
           </p>
         </div>
@@ -81,17 +85,17 @@ export function SyncDiagram() {
         initial={{ scaleY: 0 }}
         animate={inView ? { scaleY: 1 } : { scaleY: 0 }}
         transition={{ delay: 0.6, duration: 0.4 }}
-        className="mx-auto my-2 h-8 w-px origin-top bg-custod-primary/40"
+        className="mx-auto my-2 h-8 w-px origin-top bg-primary/30"
       />
 
       <motion.div
         initial={{ opacity: 0, y: 16 }}
         animate={inView ? { opacity: 1, y: 0 } : { opacity: 0, y: 16 }}
         transition={{ delay: 0.65 }}
-        className="flex flex-wrap items-center justify-center gap-3"
+        className="flex flex-wrap items-center justify-center gap-3 rounded-full border border-border bg-muted/50 px-4 py-2"
       >
         <Radio className="size-4 text-custod-status-green" />
-        <span className="text-sm text-custod-muted">
+        <span className="text-sm text-muted-foreground">
           Realtime fan-out → badge · menu bar · widget · desk LED
         </span>
       </motion.div>

@@ -1,26 +1,17 @@
 import type { Metadata, Viewport } from "next";
-import { EB_Garamond, Geist, Geist_Mono, Inter } from "next/font/google";
+import { Hind, Yusei_Magic } from "next/font/google";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const hind = Hind({
+  variable: "--font-hind",
   subsets: ["latin"],
+  weight: ["300", "400", "500", "600", "700"],
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const yuseiMagic = Yusei_Magic({
+  variable: "--font-yusei-magic",
   subsets: ["latin"],
-});
-
-const ebGaramond = EB_Garamond({
-  variable: "--font-eb-garamond",
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-});
-
-const inter = Inter({
-  variable: "--font-inter",
-  subsets: ["latin"],
+  weight: "400",
 });
 
 export const metadata: Metadata = {
@@ -35,7 +26,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#22C55E",
+  themeColor: "#f9f6f1",
 };
 
 export default function RootLayout({
@@ -46,11 +37,10 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} ${ebGaramond.variable} ${inter.variable} h-full scroll-smooth antialiased`}
+      data-scroll-behavior="smooth"
+      className={`${hind.variable} ${yuseiMagic.variable} h-full scroll-smooth antialiased`}
     >
-      <body className="min-h-full flex flex-col bg-white font-sans text-[#0f172a]">
-        {children}
-      </body>
+      <body className="min-h-full flex flex-col">{children}</body>
     </html>
   );
 }

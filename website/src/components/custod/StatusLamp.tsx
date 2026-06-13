@@ -1,25 +1,30 @@
 "use client";
 
-import { motion } from "framer-motion";
 import { useEffect, useState } from "react";
 import type { StatusLevel } from "@/types/custod";
 import { cn } from "@/lib/utils";
 
-const STATUS_COLORS: Record<StatusLevel, { glow: string; core: string; label: string }> = {
+const STATUS_CONFIG: Record<
+  StatusLevel,
+  { core: string; glow: string; label: string; pulseClass: string }
+> = {
   green: {
-    glow: "rgba(34, 197, 94, 0.6)",
-    core: "#22C55E",
+    core: "var(--custod-status-green)",
+    glow: "var(--custod-status-green-glow)",
     label: "Healthy",
+    pulseClass: "",
   },
   yellow: {
-    glow: "rgba(234, 179, 8, 0.6)",
-    core: "#EAB308",
+    core: "var(--custod-status-yellow)",
+    glow: "var(--custod-status-yellow-glow)",
     label: "Caution",
+    pulseClass: "animate-[custod-pulse-amber_2s_ease-in-out_infinite]",
   },
   red: {
-    glow: "rgba(239, 68, 68, 0.7)",
-    core: "#EF4444",
+    core: "var(--custod-status-red)",
+    glow: "var(--custod-status-red-glow)",
     label: "Burnout risk",
+    pulseClass: "animate-[custod-pulse-red_0.8s_ease-in-out_infinite]",
   },
 };
 
@@ -52,49 +57,37 @@ export function StatusLamp({
     return () => window.clearInterval(id);
   }, [animate, controlledStatus]);
 
-  const colors = STATUS_COLORS[status];
-  const sizeClasses = {
-    sm: "size-8",
-    md: "size-16",
-    lg: "size-24",
-  };
+  const config = STATUS_CONFIG[status];
+  const sizeClasses = { sm: "size-8", md: "size-16", lg: "size-24" };
 
   return (
     <div className={cn("flex flex-col items-center gap-3", className)}>
       <div className="relative flex items-center justify-center">
-        <motion.div
-          animate={
-            status === "yellow"
-              ? { opacity: [0.5, 1, 0.5], scale: [1, 1.15, 1] }
-              : status === "red"
-                ? { opacity: [1, 0.4, 1], scale: [1, 1.1, 1] }
-                : { opacity: 1, scale: 1 }
-          }
-          transition={{
-            duration: status === "red" ? 0.8 : 2,
-            repeat: status !== "green" ? Infinity : 0,
-            ease: "easeInOut",
-          }}
-          className={cn("rounded-full blur-xl", sizeClasses[size])}
-          style={{ backgroundColor: colors.glow }}
+        <div
+          className={cn(
+            "absolute rounded-full blur-xl",
+            sizeClasses[size],
+            config.pulseClass,
+          )}
+          style={{ backgroundColor: config.glow }}
         />
         <div
           className={cn(
-            "relative rounded-full border-2 border-white/20 shadow-lg",
+            "relative rounded-full border-2 border-border bg-card",
             sizeClasses[size],
           )}
           style={{
-            backgroundColor: colors.core,
-            boxShadow: `0 0 24px ${colors.glow}, inset 0 2px 4px rgba(255,255,255,0.3)`,
+            backgroundColor: config.core,
+            boxShadow: `0 0 28px ${config.glow}, inset 0 2px 6px rgb(255 255 255 / 35%)`,
           }}
         />
       </div>
       {showLabel ? (
         <span
-          className="text-xs font-medium uppercase tracking-wider"
-          style={{ color: colors.core }}
+          className="text-xs font-semibold uppercase tracking-[0.15em]"
+          style={{ color: config.core }}
         >
-          {colors.label}
+          {config.label}
         </span>
       ) : null}
     </div>
@@ -108,15 +101,18 @@ export function StatusDot({
   status: StatusLevel;
   className?: string;
 }) {
-  const color = STATUS_COLORS[status].core;
+  const config = STATUS_CONFIG[status];
   return (
     <span
-      className={cn("inline-block size-2.5 rounded-full", className)}
-      style={{ backgroundColor: color, boxShadow: `0 0 8px ${color}` }}
+      className={cn("inline-block size-2.5 shrink-0 rounded-full", className)}
+      style={{
+        backgroundColor: config.core,
+        boxShadow: `0 0 8px ${config.glow}`,
+      }}
     />
   );
 }
 
 export function getStatusColor(status: StatusLevel): string {
-  return STATUS_COLORS[status].core;
+  return STATUS_CONFIG[status].core;
 }

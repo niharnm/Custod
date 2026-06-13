@@ -1,12 +1,12 @@
 "use client";
 
 import { SyncDiagram } from "@/components/custod/SyncDiagram";
-import { SectionHeading } from "@/components/custod/SectionPrimitives";
+import { SectionHeading, SectionShell } from "@/components/custod/SectionPrimitives";
 import { HOW_IT_WORKS } from "@/lib/custod-content";
 
 export function HowItWorksSection() {
   return (
-    <section id="how-it-works" className="scroll-mt-24 px-5 py-12 md:px-8 md:py-16 lg:py-24">
+    <SectionShell id="how-it-works">
       <SectionHeading
         title={HOW_IT_WORKS.title}
         subtitle={HOW_IT_WORKS.subtitle}
@@ -15,19 +15,21 @@ export function HowItWorksSection() {
 
       <SyncDiagram />
 
-      <div className="mx-auto mt-12 grid max-w-4xl gap-6 md:grid-cols-3">
-        {HOW_IT_WORKS.steps.map((step) => (
-          <div
-            key={step.label}
-            className="rounded-2xl border border-[#E2E8F0] bg-white p-5 text-center shadow-sm"
-          >
-            <p className="text-sm font-semibold uppercase tracking-wide text-custod-primary">
+      <div className="mx-auto mt-12 grid max-w-4xl gap-4 md:grid-cols-3 md:gap-6">
+        {HOW_IT_WORKS.steps.map((step, index) => (
+          <div key={step.label} className="custod-card p-5 text-center">
+            <span className="font-heading text-3xl text-accent">
+              {String(index + 1).padStart(2, "0")}
+            </span>
+            <p className="mt-2 text-sm font-semibold uppercase tracking-wide text-primary">
               {step.label}
             </p>
-            <p className="mt-2 text-sm text-custod-muted">{step.description}</p>
+            <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+              {step.description}
+            </p>
           </div>
         ))}
       </div>
-    </section>
+    </SectionShell>
   );
 }

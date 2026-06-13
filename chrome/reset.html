@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>BurnoutCheck — Reset</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: #0f1117;
+        color: #ffffff;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+      .wrap {
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        padding: 24px;
+      }
+      .timer {
+        font-size: 72px;
+        font-weight: 200;
+        letter-spacing: 2px;
+        line-height: 1;
+      }
+      .prompt {
+        font-size: 22px;
+        color: #9fe1cb;
+        margin-top: 28px;
+        min-height: 30px;
+        max-width: 520px;
+        transition: opacity 0.4s ease;
+      }
+      .bar-track {
+        width: 260px;
+        height: 3px;
+        background: #1c1f2a;
+        border-radius: 2px;
+        margin-top: 40px;
+        overflow: hidden;
+      }
+      .bar-fill {
+        height: 100%;
+        width: 100%;
+        background: #1d9e75;
+        border-radius: 2px;
+        transition: width 1s linear;
+      }
+      .done {
+        font-size: 30px;
+        font-weight: 300;
+        color: #1d9e75;
+        display: none;
+      }
+      .close-btn {
+        display: none;
+        margin-top: 32px;
+        padding: 10px 22px;
+        font-size: 14px;
+        background: transparent;
+        color: #9fe1cb;
+        border: 1px solid #2c5e4f;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: background 0.15s ease;
+      }
+      .close-btn:hover {
+        background: #15241e;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div id="timer" class="timer">3:00</div>
+      <div id="prompt" class="prompt">Close your eyes</div>
+      <div class="bar-track">
+        <div id="bar" class="bar-fill"></div>
+      </div>
+      <div id="done" class="done">Ready to go.</div>
+      <button id="closeBtn" class="close-btn">Close tab</button>
+    </div>
+
+    <script>
+      (function () {
+        var TOTAL = 180; // seconds
+        var remaining = TOTAL;
+
+        // seconds-remaining -> prompt text
+        var SCHEDULE = {
+          180: "Close your eyes",
+          156: "Breathe in… 2… 3… 4",
+          152: "Hold… 2… 3… 4",
+          148: "Breathe out… 2… 3… 4… 5… 6",
+          142: "Hold… 2",
+          140: "Breathe in… 2… 3… 4",
+          136: "Hold… 2… 3… 4",
+          132: "Breathe out… 2… 3… 4… 5… 6",
+          126: "You are not behind. You are here.",
+          110: "Breathe in… 2… 3… 4",
+          106: "Hold… 2… 3… 4",
+          102: "Breathe out… 2… 3… 4… 5… 6",
+          90: "Feel your feet on the floor",
+          75: "Breathe in… 2… 3… 4",
+          71: "Hold… 2… 3… 4",
+          67: "Breathe out… 2… 3… 4… 5… 6",
+          50: "One thing. What matters most right now?",
+          35: "Breathe in… 2… 3… 4",
+          31: "Hold… 2… 3… 4",
+          27: "Breathe out… 2… 3… 4… 5… 6",
+          10: "Almost done. You've got this."
+        };
+
+        var timerEl = document.getElementById("timer");
+        var promptEl = document.getElementById("prompt");
+        var barEl = document.getElementById("bar");
+        var doneEl = document.getElementById("done");
+        var closeBtn = document.getElementById("closeBtn");
+
+        closeBtn.addEventListener("click", function () {
+          window.close();
+        });
+
+        function fmt(s) {
+          var m = Math.floor(s / 60);
+          var sec = s % 60;
+          return m + ":" + (sec < 10 ? "0" : "") + sec;
+        }
+
+        function updatePrompt(s) {
+          if (Object.prototype.hasOwnProperty.call(SCHEDULE, s)) {
+            promptEl.style.opacity = "0";
+            setTimeout(function () {
+              promptEl.textContent = SCHEDULE[s];
+              promptEl.style.opacity = "1";
+            }, 250);
+          }
+        }
+
+        function finish() {
+          timerEl.style.display = "none";
+          promptEl.style.display = "none";
+          document.querySelector(".bar-track").style.display = "none";
+          doneEl.style.display = "block";
+          closeBtn.style.display = "inline-block";
+        }
+
+        // Initial render
+        timerEl.textContent = fmt(remaining);
+        barEl.style.width = "100%";
+
+        var interval = setInterval(function () {
+          remaining--;
+          if (remaining <= 0) {
+            remaining = 0;
+            timerEl.textContent = fmt(0);
+            barEl.style.width = "0%";
+            clearInterval(interval);
+            finish();
+            return;
+          }
+          timerEl.textContent = fmt(remaining);
+          barEl.style.width = (remaining / TOTAL) * 100 + "%";
+          updatePrompt(remaining);
+        }, 1000);
+      })();
+    </script>
+  </body>
+</html>
