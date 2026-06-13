@@ -1,0 +1,126 @@
+"use client";
+
+import { Menu, X } from "lucide-react";
+import Link from "next/link";
+import { useEffect, useState } from "react";
+import { NAV_LINKS } from "@/lib/custod-content";
+import { cn } from "@/lib/utils";
+
+export function Header() {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [showFloatingCta, setShowFloatingCta] = useState(false);
+
+  useEffect(() => {
+    const onScroll = () => {
+      const downloadEl = document.getElementById("download-button");
+      if (!downloadEl) return;
+      const rect = downloadEl.getBoundingClientRect();
+      setShowFloatingCta(rect.bottom < 0);
+    };
+
+    window.addEventListener("scroll", onScroll, { passive: true });
+    onScroll();
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  return (
+    <>
+      <header className="absolute inset-x-0 top-0 z-50 px-5 text-white md:px-8">
+        <div className="mx-auto flex max-w-6xl items-center justify-between py-5">
+          <Link
+            href="/"
+            className="font-heading text-2xl font-semibold tracking-tight text-white"
+          >
+            Custod
+          </Link>
+
+          <nav className="hidden items-center gap-8 md:flex">
+            {NAV_LINKS.map((link) => (
+              <Link
+                key={link.label}
+                href={link.href}
+                className="text-sm font-medium text-white/85 transition-colors hover:text-white"
+              >
+                {link.label}
+              </Link>
+            ))}
+          </nav>
+
+          <div className="hidden md:block">
+            <Link
+              href="mailto:hello@custod.app?subject=Custod%20Waitlist"
+              className="custod-primary-button rounded-lg px-4 py-2.5 text-sm font-medium text-white transition hover:scale-[1.03] active:scale-[0.97]"
+            >
+              Join waitlist
+            </Link>
+          </div>
+
+          <button
+            type="button"
+            className="inline-flex items-center gap-2 rounded-lg border border-white/20 px-3 py-2 text-sm md:hidden"
+            onClick={() => setMenuOpen(true)}
+            aria-label="Open menu"
+          >
+            <Menu className="size-4" />
+          </button>
+        </div>
+      </header>
+
+      <div
+        className={cn(
+          "fixed right-5 top-3 z-50 transition-opacity duration-300 md:right-8",
+          showFloatingCta ? "opacity-100" : "pointer-events-none opacity-0",
+        )}
+      >
+        <Link
+          href="mailto:hello@custod.app?subject=Custod%20Waitlist"
+          className="custod-primary-button rounded-lg px-4 py-2.5 text-sm font-medium text-white shadow-lg"
+        >
+          Join waitlist
+        </Link>
+      </div>
+
+      {menuOpen ? (
+        <div className="fixed inset-0 z-[60] md:hidden">
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/40"
+            aria-label="Close menu"
+            onClick={() => setMenuOpen(false)}
+          />
+          <div className="absolute inset-x-0 bottom-0 max-h-[75dvh] rounded-t-3xl bg-white p-6 text-[#0f172a]">
+            <div className="mb-6 flex items-center justify-between">
+              <span className="font-semibold">Menu</span>
+              <button
+                type="button"
+                onClick={() => setMenuOpen(false)}
+                aria-label="Close"
+              >
+                <X className="size-5" />
+              </button>
+            </div>
+            <nav className="flex flex-col gap-4">
+              {NAV_LINKS.map((link) => (
+                <Link
+                  key={link.label}
+                  href={link.href}
+                  className="text-lg font-medium"
+                  onClick={() => setMenuOpen(false)}
+                >
+                  {link.label}
+                </Link>
+              ))}
+            </nav>
+            <Link
+              href="mailto:hello@custod.app?subject=Custod%20Waitlist"
+              className="custod-primary-button mt-8 block w-full rounded-lg px-4 py-3 text-center text-sm font-medium text-white"
+              onClick={() => setMenuOpen(false)}
+            >
+              Join waitlist
+            </Link>
+          </div>
+        </div>
+      ) : null}
+    </>
+  );
+}

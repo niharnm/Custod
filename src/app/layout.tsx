@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { EB_Garamond, Geist, Geist_Mono, Inter } from "next/font/google";
 import "./globals.css";
 
@@ -24,15 +24,18 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Cluely - Live AI Meeting Assistant | Real-Time Meeting Notes and AI Insights",
+  title: "Custod — Your silent guardian",
   description:
-    "AI meeting assistant that provides live meeting notes, instant answers, and real-time insights during calls. Unlike Otter or Granola, helps you during meetings, not just after.",
-  applicationName: "Cluely",
-  themeColor: "#DDE2EE",
+    "A privacy-first, cross-platform check engine light for burnout. Custod fuses browser, computer, phone, and desk signals into one real-time green, yellow, or red status — before you crash.",
+  applicationName: "Custod",
   icons: {
-    icon: "/seo/favicon.png",
-    apple: "/seo/favicon.png",
+    icon: "/seo/favicon.svg",
+    apple: "/seo/favicon.svg",
   },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#22C55E",
 };
 
 export default function RootLayout({
@@ -45,7 +48,7 @@ export default function RootLayout({
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} ${ebGaramond.variable} ${inter.variable} h-full scroll-smooth antialiased`}
     >
-      <body className="min-h-full flex flex-col bg-white font-sans text-[#19191D]">
+      <body className="min-h-full flex flex-col bg-white font-sans text-[#0f172a]">
         {children}
       </body>
     </html>

@@ -1,13 +1,16 @@
-import { BottomCtaSection, GradientFade } from "@/components/cluely/BottomCtaSection";
-import { FaqSection } from "@/components/cluely/FaqSection";
-import { Footer } from "@/components/cluely/Footer";
-import { Header } from "@/components/cluely/Header";
-import { HeroSection } from "@/components/cluely/HeroSection";
-import { HowItWorksSection } from "@/components/cluely/HowItWorksSection";
-import { MeetingNotesSection } from "@/components/cluely/MeetingNotesSection";
-import { SectionDivider } from "@/components/cluely/SectionPrimitives";
-import { TranscriptionSection } from "@/components/cluely/TranscriptionSection";
-import { UndetectabilitySection } from "@/components/cluely/UndetectabilitySection";
+import { AudienceCtaSection } from "@/components/custod/AudienceCtaSection";
+import { Footer } from "@/components/custod/Footer";
+import { FourComponentsSection } from "@/components/custod/FourComponentsSection";
+import { Header } from "@/components/custod/Header";
+import { HeroSection } from "@/components/custod/HeroSection";
+import { HowItWorksSection } from "@/components/custod/HowItWorksSection";
+import { PrivacyFaqSection } from "@/components/custod/PrivacyFaqSection";
+import { ProblemSection } from "@/components/custod/ProblemSection";
+import {
+  GradientFade,
+  SectionDivider,
+} from "@/components/custod/SectionPrimitives";
+import { SignalsSection } from "@/components/custod/SignalsSection";
 
 export default function Home() {
   return (
@@ -18,14 +21,14 @@ export default function Home() {
         <SectionDivider />
         <HowItWorksSection />
         <SectionDivider />
-        <MeetingNotesSection />
+        <ProblemSection />
         <SectionDivider />
-        <UndetectabilitySection />
+        <FourComponentsSection />
         <SectionDivider />
-        <TranscriptionSection />
+        <SignalsSection />
         <SectionDivider />
-        <FaqSection />
-        <BottomCtaSection />
+        <PrivacyFaqSection />
+        <AudienceCtaSection />
         <GradientFade />
       </main>
       <Footer />
