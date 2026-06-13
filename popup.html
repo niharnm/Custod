@@ -7,59 +7,82 @@
     <title>BurnoutCheck</title>
   </head>
   <body>
-    <!-- 1. Header -->
-    <header class="header">
-      <span class="brand">BurnoutCheck</span>
-      <span id="statusDot" class="status-dot"></span>
-    </header>
-
-    <!-- 2. Score ring -->
-    <div class="ring-wrap">
-      <canvas id="ring" width="140" height="140"></canvas>
-      <div class="ring-center">
-        <div id="scoreNum" class="score-num">–</div>
-        <div id="statusLabel" class="status-label">Loading…</div>
+    <!-- Auth gate -->
+    <div id="authView" class="auth-view hidden">
+      <header class="header">
+        <span class="brand">BurnoutCheck</span>
+      </header>
+      <div class="auth-body">
+        <h2 id="authTitle" class="auth-title">Sign in</h2>
+        <p class="auth-sub">Track visits in hourly sessions while signed in.</p>
+        <form id="authForm" class="auth-form">
+          <label class="auth-label">
+            Email
+            <input id="authEmail" type="email" autocomplete="email" required />
+          </label>
+          <label class="auth-label">
+            Password
+            <input id="authPassword" type="password" autocomplete="current-password" required minlength="6" />
+          </label>
+          <div id="authError" class="auth-error hidden"></div>
+          <button id="authSubmit" type="submit" class="auth-submit">Sign in</button>
+        </form>
+        <button id="authToggle" type="button" class="auth-toggle">
+          Need an account? Create one
+        </button>
       </div>
     </div>
 
-    <!-- 3. Stats row -->
-    <div class="stats">
-      <div class="stat">
-        <div id="statTabs" class="stat-val">–</div>
-        <div class="stat-label">tabs</div>
+    <!-- Main dashboard -->
+    <div id="appView" class="hidden">
+      <header class="header">
+        <span class="brand">BurnoutCheck</span>
+        <div class="header-right">
+          <span id="statusDot" class="status-dot"></span>
+          <button id="logoutBtn" type="button" class="logout-btn" title="Log out">Log out</button>
+        </div>
+      </header>
+      <div id="userEmail" class="user-email"></div>
+
+      <div class="ring-wrap">
+        <canvas id="ring" width="140" height="140"></canvas>
+        <div class="ring-center">
+          <div id="scoreNum" class="score-num">–</div>
+          <div id="statusLabel" class="status-label">Loading…</div>
+        </div>
       </div>
-      <div class="stat-divider"></div>
-      <div class="stat">
-        <div id="statSwitches" class="stat-val">–</div>
-        <div class="stat-label">switches/min</div>
+
+      <div class="stats">
+        <div class="stat">
+          <div id="statTabs" class="stat-val">–</div>
+          <div class="stat-label">tabs</div>
+        </div>
+        <div class="stat-divider"></div>
+        <div class="stat">
+          <div id="statSwitches" class="stat-val">–</div>
+          <div class="stat-label">switches/min</div>
+        </div>
+        <div class="stat-divider"></div>
+        <div class="stat">
+          <div id="statSession" class="stat-val">–</div>
+          <div class="stat-label">session min</div>
+        </div>
       </div>
-      <div class="stat-divider"></div>
-      <div class="stat">
-        <div id="statSession" class="stat-val">–</div>
-        <div class="stat-label">session min</div>
+
+      <div class="divider"></div>
+
+      <div id="triggers" class="triggers"></div>
+      <div id="intervention" class="intervention"></div>
+      <div id="actions" class="actions"></div>
+
+      <div class="sparkline-label">7-day trend</div>
+      <canvas id="sparkline" width="280" height="48" class="sparkline"></canvas>
+
+      <div class="privacy">
+        Visits are logged as URL + title in hourly sessions. Switches include tab, title, and URL changes.
       </div>
     </div>
 
-    <div class="divider"></div>
-
-    <!-- 5. Trigger pills -->
-    <div id="triggers" class="triggers"></div>
-
-    <!-- 6. Intervention callout -->
-    <div id="intervention" class="intervention"></div>
-
-    <!-- 7. Action buttons -->
-    <div id="actions" class="actions"></div>
-
-    <!-- 8. Sparkline -->
-    <div class="sparkline-label">7-day trend</div>
-    <canvas id="sparkline" width="280" height="48" class="sparkline"></canvas>
-
-    <!-- 9. Privacy note -->
-    <div class="privacy">
-      No page content is ever read. Only tab counts and titles.
-    </div>
-
-    <script src="popup.js"></script>
+    <script type="module" src="popup.js"></script>
   </body>
 </html>

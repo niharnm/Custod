@@ -31,11 +31,106 @@ body {
   font-weight: 600;
   letter-spacing: -0.2px;
 }
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
 .status-dot {
   width: 10px;
   height: 10px;
   border-radius: 50%;
   background: var(--green);
+}
+.logout-btn {
+  border: none;
+  background: none;
+  font-size: 10px;
+  color: #888;
+  cursor: pointer;
+  padding: 0;
+}
+.logout-btn:hover {
+  color: #444;
+}
+.user-email {
+  font-size: 10px;
+  color: #888;
+  padding: 0 16px 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hidden {
+  display: none !important;
+}
+
+/* Auth */
+.auth-body {
+  padding: 16px;
+}
+.auth-title {
+  margin: 0 0 4px;
+  font-size: 16px;
+  font-weight: 600;
+}
+.auth-sub {
+  margin: 0 0 16px;
+  font-size: 11px;
+  color: #666;
+  line-height: 1.4;
+}
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.auth-label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11px;
+  color: #555;
+}
+.auth-label input {
+  padding: 8px 10px;
+  border: 0.5px solid var(--border);
+  border-radius: 6px;
+  font-size: 13px;
+}
+.auth-error {
+  font-size: 11px;
+  color: var(--red);
+  line-height: 1.35;
+}
+.auth-submit {
+  margin-top: 4px;
+  padding: 9px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+  background: #1a1a1a;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.auth-submit:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.auth-toggle {
+  margin-top: 12px;
+  width: 100%;
+  padding: 0;
+  border: none;
+  background: none;
+  font-size: 11px;
+  color: #666;
+  cursor: pointer;
+  text-align: center;
+}
+.auth-toggle:hover {
+  color: #1a1a1a;
 }
 
 /* Score ring */

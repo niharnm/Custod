@@ -1,17 +1,24 @@
 // background.js — BurnoutCheck service worker.
-// Collects tab-behavior signals, scores them (Supabase Edge Function or local
-// fallback), updates the badge, fires notifications, and answers popup queries.
+// Collects tab-behavior signals, scores them, logs site visits in hourly
+// sessions when authenticated, updates the badge, and answers popup queries.
 //
-// PRIVACY: This reads tab counts, URLs, titles and timing only. It never reads
-// page content.
+// PRIVACY: Reads tab counts, URLs, titles and timing only. Never page content.
 
-import { postToSupabase, SUPABASE_URL, SUPABASE_KEY } from "./supabase.js";
+import {
+  postToSupabase,
+  patchToSupabase,
+  signUp,
+  signIn,
+  signOut,
+  getValidAccessToken,
+  getAuthUserId,
+  getAuthSession,
+  getFromSupabase,
+  ENDPOINTS
+} from "./supabase.js";
 
-// ---------------------------------------------------------------------------
-// Constants
-// ---------------------------------------------------------------------------
-const SCORE_ENDPOINT = SUPABASE_URL + "/functions/v1/score";
-const READING_ENDPOINT = SUPABASE_URL + "/rest/v1/browser_readings";
+const HOUR_MS = 60 * 60 * 1000;
+const VISIT_DEDUPE_MS = 30 * 1000;
 
 const DISTRACTION_DOMAINS = [
   "youtube.com",
@@ -46,33 +53,52 @@ const STRESS_KEYWORDS = [
   "procrastinat"
 ];
 
-// ---------------------------------------------------------------------------
-// In-memory rolling state. A service worker can be torn down at any time, so
-// anything that must survive (frustrationCount, sessionStart) is also mirrored
-// into chrome.storage.local and rehydrated on wake.
-// ---------------------------------------------------------------------------
-let tabSwitchEvents = []; // array of timestamps (ms)
+let tabSwitchEvents = [];
 let lastActiveTabId = null;
+let lastSwitchMs = 0;
+const lastTitleByTab = {};
+const SWITCH_DEBOUNCE_MS = 500;
 let sessionStart = Date.now();
 let lastDistractionMs = null;
 let frustrationCount = 0;
 
-// Rehydrate volatile state when the worker spins back up.
+let currentSessionId = null;
+let sessionStartedAt = null;
+let lastVisitUrl = null;
+let lastVisitAt = 0;
+
 (async function rehydrate() {
   try {
     const stored = await chrome.storage.local.get([
       "sessionStart",
       "lastDistractionMs",
       "frustrationCount",
-      "tabSwitchEvents"
+      "tabSwitchEvents",
+      "currentSessionId",
+      "sessionStartedAt"
     ]);
     if (typeof stored.sessionStart === "number") sessionStart = stored.sessionStart;
     if (typeof stored.lastDistractionMs === "number") lastDistractionMs = stored.lastDistractionMs;
     if (typeof stored.frustrationCount === "number") frustrationCount = stored.frustrationCount;
     if (Array.isArray(stored.tabSwitchEvents)) tabSwitchEvents = stored.tabSwitchEvents;
+    if (typeof stored.currentSessionId === "string") currentSessionId = stored.currentSessionId;
+    if (typeof stored.sessionStartedAt === "number") sessionStartedAt = stored.sessionStartedAt;
   } catch (e) {
     console.warn("[BurnoutCheck] rehydrate failed:", e && e.message);
   }
+
+  const token = await getValidAccessToken();
+  if (token) {
+    await ensureHourlySession();
+  }
+
+  try {
+    const [activeTab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+    if (activeTab && activeTab.id != null) {
+      lastActiveTabId = activeTab.id;
+      if (activeTab.title) lastTitleByTab[activeTab.id] = activeTab.title;
+    }
+  } catch (_) {}
 })();
 
 async function persistVolatile() {
@@ -81,16 +107,15 @@ async function persistVolatile() {
       sessionStart,
       lastDistractionMs,
       frustrationCount,
-      tabSwitchEvents
+      tabSwitchEvents,
+      currentSessionId,
+      sessionStartedAt
     });
   } catch (e) {
     /* storage best-effort */
   }
 }
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
 function hostnameOf(url) {
   try {
     return new URL(url).hostname.replace(/^www\./, "");
@@ -102,9 +127,7 @@ function hostnameOf(url) {
 function isDistraction(url) {
   const host = hostnameOf(url);
   if (!host) return false;
-  return DISTRACTION_DOMAINS.some(
-    (d) => host === d || host.endsWith("." + d)
-  );
+  return DISTRACTION_DOMAINS.some((d) => host === d || host.endsWith("." + d));
 }
 
 function matchesStressKeyword(text) {
@@ -119,13 +142,42 @@ function statusFromScore(score) {
   return "red";
 }
 
-// ---------------------------------------------------------------------------
-// Lifecycle: register alarms on install AND on startup so the worker recovers
-// after a browser restart.
-// ---------------------------------------------------------------------------
+function recordSwitch() {
+  const now = Date.now();
+  if (now - lastSwitchMs < SWITCH_DEBOUNCE_MS) return;
+  lastSwitchMs = now;
+  tabSwitchEvents.push(now);
+  persistVolatile();
+}
+
+function computeSwitchRatePerMin(now = Date.now()) {
+  const fiveMinAgo = now - 5 * 60 * 1000;
+  const switchesLast5 = tabSwitchEvents.filter((ts) => ts >= fiveMinAgo).length;
+  return Math.round((switchesLast5 / 5) * 100) / 100;
+}
+
+function computeSessionMinutes(now = Date.now()) {
+  if (sessionStartedAt) {
+    return Math.max(0, Math.round((now - sessionStartedAt) / 60000));
+  }
+  return Math.max(0, Math.round((now - sessionStart) / 60000));
+}
+
+function isTrackableUrl(url) {
+  if (!url) return false;
+  return !(
+    url.startsWith("chrome://") ||
+    url.startsWith("chrome-extension://") ||
+    url.startsWith("about:") ||
+    url.startsWith("edge://") ||
+    url.startsWith("devtools://")
+  );
+}
+
 function registerAlarms() {
   chrome.alarms.create("collectAndScore", { periodInMinutes: 5 });
   chrome.alarms.create("pruneState", { periodInMinutes: 1 });
+  chrome.alarms.create("sessionCheck", { periodInMinutes: 1 });
 }
 
 chrome.runtime.onInstalled.addListener(() => {
@@ -135,30 +187,27 @@ chrome.runtime.onInstalled.addListener(() => {
   tabSwitchEvents = [];
   persistVolatile();
   registerAlarms();
-  // Prime the badge so the icon is meaningful before the first cycle.
   collectAndScore();
 });
 
-chrome.runtime.onStartup.addListener(() => {
+chrome.runtime.onStartup.addListener(async () => {
   sessionStart = Date.now();
   tabSwitchEvents = [];
   persistVolatile();
   registerAlarms();
   collectAndScore();
+  const token = await getValidAccessToken();
+  if (token) await ensureHourlySession();
 });
 
-// ---------------------------------------------------------------------------
-// Tab switch tracking
-// ---------------------------------------------------------------------------
 chrome.tabs.onActivated.addListener(async (activeInfo) => {
-  // Only count genuine switches (a different tab gaining focus).
   if (activeInfo.tabId !== lastActiveTabId) {
-    tabSwitchEvents.push(Date.now());
+    recordSwitch();
     lastActiveTabId = activeInfo.tabId;
   }
-  // If the newly active tab is a distraction, mark the moment.
   try {
     const tab = await chrome.tabs.get(activeInfo.tabId);
+    if (tab && tab.title) lastTitleByTab[activeInfo.tabId] = tab.title;
     if (tab && isDistraction(tab.url || tab.pendingUrl || "")) {
       lastDistractionMs = Date.now();
     }
@@ -168,14 +217,36 @@ chrome.tabs.onActivated.addListener(async (activeInfo) => {
   persistVolatile();
 });
 
-// ---------------------------------------------------------------------------
-// Alarms
-// ---------------------------------------------------------------------------
+// Count title and URL changes on the active tab (SPAs, in-tab navigation).
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  if (!tab || !tab.active) return;
+
+  if (changeInfo.url && isTrackableUrl(changeInfo.url)) {
+    recordSwitch();
+    return;
+  }
+
+  if (changeInfo.title) {
+    const prev = lastTitleByTab[tabId];
+    const next = changeInfo.title.trim();
+    if (prev && next && prev !== next) {
+      recordSwitch();
+    }
+    if (next) lastTitleByTab[tabId] = next;
+  }
+});
+
+chrome.tabs.onRemoved.addListener((tabId) => {
+  delete lastTitleByTab[tabId];
+});
+
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === "collectAndScore") {
     collectAndScore();
   } else if (alarm.name === "pruneState") {
     pruneState();
+  } else if (alarm.name === "sessionCheck") {
+    checkHourlySession();
   } else if (alarm.name === "focusEnd") {
     showSimpleNotification("Focus session complete", "Nice work. Your 20-minute focus block is done.");
   } else if (alarm.name === "stopTime") {
@@ -184,10 +255,143 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 });
 
 function pruneState() {
-  const cutoff = Date.now() - 10 * 60 * 1000; // keep last 10 minutes
+  const cutoff = Date.now() - 10 * 60 * 1000;
   tabSwitchEvents = tabSwitchEvents.filter((ts) => ts >= cutoff);
   persistVolatile();
 }
+
+// ---------------------------------------------------------------------------
+// Hourly browsing sessions (Supabase)
+// ---------------------------------------------------------------------------
+async function ensureHourlySession() {
+  const token = await getValidAccessToken();
+  const userId = await getAuthUserId();
+  if (!token || !userId) return null;
+
+  const now = Date.now();
+  if (currentSessionId && sessionStartedAt && now - sessionStartedAt < HOUR_MS) {
+    return currentSessionId;
+  }
+
+  if (currentSessionId) {
+    await closeHourlySession(currentSessionId, token);
+  }
+
+  const row = {
+    user_id: userId,
+    started_at: new Date(now).toISOString()
+  };
+  const created = await postToSupabase(
+    ENDPOINTS.sessions,
+    row,
+    token,
+    "return=representation"
+  );
+
+  if (created && created.id) {
+    currentSessionId = created.id;
+  } else if (Array.isArray(created) && created[0] && created[0].id) {
+    currentSessionId = created[0].id;
+  } else {
+    const rows = await getFromSupabase(
+      ENDPOINTS.sessions +
+        "?select=id&ended_at=is.null&order=started_at.desc&limit=1",
+      token
+    );
+    if (rows && rows[0] && rows[0].id) {
+      currentSessionId = rows[0].id;
+    } else {
+      console.warn("[BurnoutCheck] failed to create hourly session");
+      return null;
+    }
+  }
+
+  sessionStartedAt = now;
+  await persistVolatile();
+  return currentSessionId;
+}
+
+async function closeHourlySession(sessionId, token) {
+  if (!sessionId || !token) return;
+  await patchToSupabase(
+    ENDPOINTS.sessions,
+    "id=eq." + encodeURIComponent(sessionId),
+    { ended_at: new Date().toISOString() },
+    token
+  );
+}
+
+async function checkHourlySession() {
+  const token = await getValidAccessToken();
+  if (!token) return;
+  await ensureHourlySession();
+}
+
+async function clearLocalHourlySession() {
+  currentSessionId = null;
+  sessionStartedAt = null;
+  await persistVolatile();
+}
+
+async function onAuthSignedIn() {
+  await ensureHourlySession();
+}
+
+async function onAuthSignedOut() {
+  const token = await getValidAccessToken();
+  if (currentSessionId && token) {
+    await closeHourlySession(currentSessionId, token);
+  }
+  await clearLocalHourlySession();
+  await signOut();
+}
+
+function getCurrentSessionId() {
+  return currentSessionId;
+}
+
+// ---------------------------------------------------------------------------
+// Site visit logging
+// ---------------------------------------------------------------------------
+chrome.webNavigation.onCompleted.addListener(async (details) => {
+  if (details.frameId !== 0) return;
+  const url = details.url || "";
+  if (!isTrackableUrl(url)) return;
+
+  const token = await getValidAccessToken();
+  if (!token) return;
+
+  const sessionId = await ensureHourlySession();
+  if (!sessionId) return;
+
+  const userId = await getAuthUserId();
+  if (!userId) return;
+
+  const now = Date.now();
+  if (url === lastVisitUrl && now - lastVisitAt < VISIT_DEDUPE_MS) return;
+  lastVisitUrl = url;
+  lastVisitAt = now;
+
+  let title = "";
+  try {
+    const tab = await chrome.tabs.get(details.tabId);
+    title = tab && tab.title ? tab.title : "";
+  } catch (_) {
+    /* tab may be gone */
+  }
+
+  postToSupabase(
+    ENDPOINTS.visits,
+    {
+      user_id: userId,
+      session_id: sessionId,
+      url,
+      title,
+      visited_at: new Date(now).toISOString()
+    },
+    token
+  );
+});
 
 // ---------------------------------------------------------------------------
 // Core: collect signals, score, store, badge, notify
@@ -223,9 +427,7 @@ async function collectAndScore() {
   const distraction_ratio =
     tab_count > 0 ? Math.round((distraction_count / tab_count) * 100) / 100 : 0;
 
-  const fiveMinAgo = now - 5 * 60 * 1000;
-  const switchesLast5 = tabSwitchEvents.filter((ts) => ts >= fiveMinAgo).length;
-  const switch_rate_per_min = Math.round((switchesLast5 / 5) * 100) / 100;
+  const switch_rate_per_min = computeSwitchRatePerMin(now);
   const spiral_mode = switch_rate_per_min > 5;
 
   const session_minutes = Math.max(0, Math.round((now - sessionStart) / 60000));
@@ -254,21 +456,35 @@ async function collectAndScore() {
     ts: now
   };
 
-  // Fire-and-forget raw reading insert.
-  postToSupabase(READING_ENDPOINT, features);
+  const token = await getValidAccessToken();
+  const userId = token ? await getAuthUserId() : null;
+  const hourlySessionId = token ? getCurrentSessionId() || (await ensureHourlySession()) : null;
 
-  // Score: try the Edge Function, fall back to local heuristic.
-  let result = await postToSupabase(SCORE_ENDPOINT, features);
-  if (!result || typeof result.score !== "number") {
-    result = localFallbackScore(features);
+  if (token && userId) {
+    const readingPayload = {
+      ...features,
+      user_id: userId,
+      session_id: hourlySessionId
+    };
+    postToSupabase(ENDPOINTS.readings, readingPayload, token);
+
+    let result = await postToSupabase(ENDPOINTS.score, features, token);
+    if (!result || typeof result.score !== "number") {
+      result = localFallbackScore(features);
+    }
+    await finishScoring(result, features, now);
+  } else {
+    const result = localFallbackScore(features);
+    await finishScoring(result, features, now);
   }
+}
 
+async function finishScoring(result, features, now) {
   const score = Math.max(0, Math.min(100, Math.round(result.score)));
   const status = result.status || statusFromScore(score);
   const triggers = Array.isArray(result.triggers) ? result.triggers : [];
   const intervention = result.intervention || "";
 
-  // History: append and trim to last 7 days.
   let scoreHistory = [];
   try {
     const stored = await chrome.storage.local.get("scoreHistory");
@@ -278,7 +494,6 @@ async function collectAndScore() {
   const weekAgo = now - 7 * 24 * 60 * 60 * 1000;
   scoreHistory = scoreHistory.filter((e) => e.ts >= weekAgo);
 
-  // Detect yellow/green -> red transition for notification.
   let prevStatus = "green";
   try {
     const stored = await chrome.storage.local.get("prevStatus");
@@ -291,11 +506,12 @@ async function collectAndScore() {
     lastTriggers: triggers,
     lastIntervention: intervention,
     lastUpdated: now,
+    lastSwitchRatePerMin: features.switch_rate_per_min,
+    lastSessionMinutes: computeSessionMinutes(now),
     scoreHistory,
     prevStatus: status
   });
 
-  // Reset the frustration counter for the next window.
   frustrationCount = 0;
   await persistVolatile();
 
@@ -306,10 +522,6 @@ async function collectAndScore() {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Local fallback scorer — keeps the extension fully functional offline / before
-// the Supabase project exists.
-// ---------------------------------------------------------------------------
 function localFallbackScore(f) {
   let score = 0;
 
@@ -328,7 +540,6 @@ function localFallbackScore(f) {
   score = Math.min(100, score);
   const status = statusFromScore(score);
 
-  // Build triggers from whichever signals are high.
   const triggers = [];
   if (f.tab_count > 10) triggers.push(f.tab_count + " tabs open");
   if (f.switch_rate_per_min > 2) {
@@ -343,7 +554,6 @@ function localFallbackScore(f) {
   if (f.late_night) triggers.push("late night");
   if (f.frustration_events > 2) triggers.push("rapid backspacing");
 
-  // Intervention keyed to status + the strongest signal.
   let intervention;
   if (status === "green") {
     intervention = "You're focused. Keep going.";
@@ -372,9 +582,6 @@ function localFallbackScore(f) {
   return { score, status, triggers, intervention };
 }
 
-// ---------------------------------------------------------------------------
-// Badge
-// ---------------------------------------------------------------------------
 function updateBadge(score, status) {
   let color = "#1D9E75";
   let text = "OK";
@@ -391,9 +598,6 @@ function updateBadge(score, status) {
   } catch (_) {}
 }
 
-// ---------------------------------------------------------------------------
-// Notifications
-// ---------------------------------------------------------------------------
 function showNotification(message) {
   try {
     chrome.notifications.create("burnout_red", {
@@ -440,6 +644,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (!msg || !msg.type) return;
 
   if (msg.type === "get_state") {
+    const now = Date.now();
     chrome.storage.local
       .get([
         "lastScore",
@@ -447,7 +652,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         "lastTriggers",
         "lastIntervention",
         "lastUpdated",
-        "scoreHistory"
+        "scoreHistory",
+        "lastSwitchRatePerMin",
+        "lastSessionMinutes"
       ])
       .then((data) => {
         sendResponse({
@@ -456,10 +663,80 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           lastTriggers: data.lastTriggers ?? [],
           lastIntervention: data.lastIntervention ?? "",
           lastUpdated: data.lastUpdated ?? null,
-          scoreHistory: data.scoreHistory ?? []
+          scoreHistory: data.scoreHistory ?? [],
+          switchRatePerMin: computeSwitchRatePerMin(now),
+          sessionMinutes: computeSessionMinutes(now),
+          switchesLast5Min: tabSwitchEvents.filter((ts) => ts >= now - 5 * 60 * 1000).length
         });
       });
-    return true; // async response
+    return true;
+  }
+
+  if (msg.type === "get_auth_state") {
+    getAuthSession().then((session) => {
+      sendResponse({
+        signedIn: !!(session && session.access_token),
+        email: session && session.user ? session.user.email : null
+      });
+    });
+    return true;
+  }
+
+  if (msg.type === "sign_in") {
+    signIn(msg.email, msg.password).then(async (result) => {
+      if (result.ok) {
+        await onAuthSignedIn();
+        sendResponse({
+          ok: true,
+          email: result.session.user && result.session.user.email
+        });
+      } else {
+        sendResponse({ ok: false, error: result.error });
+      }
+    });
+    return true;
+  }
+
+  if (msg.type === "sign_up") {
+    signUp(msg.email, msg.password).then(async (result) => {
+      if (!result.ok) {
+        sendResponse({ ok: false, error: result.error });
+        return;
+      }
+      if (result.session && result.session.access_token) {
+        await onAuthSignedIn();
+        sendResponse({
+          ok: true,
+          email: result.session.user && result.session.user.email
+        });
+        return;
+      }
+      // No session from signup (email confirm gate) — sign in immediately instead.
+      const login = await signIn(msg.email, msg.password);
+      if (login.ok) {
+        await onAuthSignedIn();
+        sendResponse({
+          ok: true,
+          email: login.session.user && login.session.user.email
+        });
+        return;
+      }
+      sendResponse({
+        ok: false,
+        error: login.error || "Account created but sign-in failed. Try signing in."
+      });
+    });
+    return true;
+  }
+
+  if (msg.type === "sign_out") {
+    onAuthSignedOut().then(() => sendResponse({ ok: true }));
+    return true;
+  }
+
+  if (msg.type === "auth_signed_in") {
+    onAuthSignedIn().then(() => sendResponse({ ok: true }));
+    return true;
   }
 
   if (msg.type === "frustration_event") {

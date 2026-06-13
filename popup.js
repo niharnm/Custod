@@ -1,4 +1,6 @@
-// popup.js — renders the BurnoutCheck popup from background state.
+// popup.js — auth gate + BurnoutCheck dashboard.
+
+import { getAuthSession } from "./supabase.js";
 
 const COLORS = {
   green: "#1D9E75",
@@ -12,11 +14,109 @@ const STATUS_TEXT = {
   red: "Burnout risk rising"
 };
 
-document.addEventListener("DOMContentLoaded", () => {
-  // Ask the background worker for the latest scored state.
+let authMode = "sign_in";
+
+document.addEventListener("DOMContentLoaded", async () => {
+  bindAuthUi();
+  const session = await getAuthSession();
+  if (session && session.access_token) {
+    showApp(session.user && session.user.email);
+  } else {
+    showAuth();
+  }
+});
+
+function bindAuthUi() {
+  const form = document.getElementById("authForm");
+  const toggle = document.getElementById("authToggle");
+  const logoutBtn = document.getElementById("logoutBtn");
+
+  form.addEventListener("submit", onAuthSubmit);
+  toggle.addEventListener("click", () => {
+    authMode = authMode === "sign_in" ? "sign_up" : "sign_in";
+    updateAuthModeUi();
+    clearAuthError();
+  });
+  logoutBtn.addEventListener("click", onLogout);
+}
+
+function updateAuthModeUi() {
+  const title = document.getElementById("authTitle");
+  const submit = document.getElementById("authSubmit");
+  const toggle = document.getElementById("authToggle");
+  const password = document.getElementById("authPassword");
+
+  if (authMode === "sign_up") {
+    title.textContent = "Create account";
+    submit.textContent = "Sign up";
+    toggle.textContent = "Already have an account? Sign in";
+    password.autocomplete = "new-password";
+  } else {
+    title.textContent = "Sign in";
+    submit.textContent = "Sign in";
+    toggle.textContent = "Need an account? Create one";
+    password.autocomplete = "current-password";
+  }
+}
+
+function showAuthError(message) {
+  const el = document.getElementById("authError");
+  el.textContent = message || "";
+  el.classList.toggle("hidden", !message);
+}
+
+function clearAuthError() {
+  showAuthError("");
+}
+
+function showAuth() {
+  document.getElementById("authView").classList.remove("hidden");
+  document.getElementById("appView").classList.add("hidden");
+  updateAuthModeUi();
+}
+
+function showApp(email) {
+  document.getElementById("authView").classList.add("hidden");
+  document.getElementById("appView").classList.remove("hidden");
+  const emailEl = document.getElementById("userEmail");
+  if (emailEl) emailEl.textContent = email || "";
+  loadDashboard();
+}
+
+async function onAuthSubmit(e) {
+  e.preventDefault();
+  clearAuthError();
+
+  const email = document.getElementById("authEmail").value.trim();
+  const password = document.getElementById("authPassword").value;
+  const submit = document.getElementById("authSubmit");
+  submit.disabled = true;
+
+  const type = authMode === "sign_up" ? "sign_up" : "sign_in";
+  chrome.runtime.sendMessage({ type, email, password }, (result) => {
+    submit.disabled = false;
+    if (chrome.runtime.lastError || !result) {
+      showAuthError("Could not reach the extension background.");
+      return;
+    }
+    if (!result.ok) {
+      showAuthError(result.error || "Authentication failed.");
+      return;
+    }
+    showApp(result.email);
+  });
+}
+
+function onLogout() {
+  chrome.runtime.sendMessage({ type: "sign_out" }, () => {
+    showAuth();
+    document.getElementById("authForm").reset();
+  });
+}
+
+function loadDashboard() {
   chrome.runtime.sendMessage({ type: "get_state" }, (state) => {
     if (chrome.runtime.lastError || !state) {
-      // No background response — render an empty/neutral popup.
       renderScore(0, "green");
       renderTriggers([], "green");
       renderIntervention("");
@@ -33,13 +133,12 @@ document.addEventListener("DOMContentLoaded", () => {
     renderSparkline(state.scoreHistory || [], status);
     loadStats(state);
   });
-});
+}
 
 function colorFor(status) {
   return COLORS[status] || COLORS.green;
 }
 
-// --- Score ring -----------------------------------------------------------
 function renderScore(score, status) {
   const color = colorFor(status);
 
@@ -65,14 +164,12 @@ function renderScore(score, status) {
 
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  // Gray track.
   ctx.beginPath();
   ctx.arc(cx, cy, radius, 0, Math.PI * 2);
   ctx.strokeStyle = "#ededed";
   ctx.lineWidth = lineWidth;
   ctx.stroke();
 
-  // Colored arc from top.
   const start = -Math.PI / 2;
   const end = (score / 100) * 2 * Math.PI - Math.PI / 2;
   ctx.beginPath();
@@ -83,7 +180,6 @@ function renderScore(score, status) {
   ctx.stroke();
 }
 
-// --- Trigger pills ---------------------------------------------------------
 function renderTriggers(triggers, status) {
   const container = document.getElementById("triggers");
   if (!container) return;
@@ -93,13 +189,12 @@ function renderTriggers(triggers, status) {
     const span = document.createElement("span");
     span.className = "trigger-pill";
     span.textContent = t;
-    span.style.background = color + "18"; // ~10% opacity
+    span.style.background = color + "18";
     span.style.color = color;
     container.appendChild(span);
   });
 }
 
-// --- Intervention ----------------------------------------------------------
 function renderIntervention(text) {
   const box = document.getElementById("intervention");
   if (!box) return;
@@ -107,7 +202,6 @@ function renderIntervention(text) {
   box.style.display = text ? "block" : "none";
 }
 
-// --- Action buttons --------------------------------------------------------
 function renderActions(status, triggers) {
   const container = document.getElementById("actions");
   if (!container) return;
@@ -115,7 +209,6 @@ function renderActions(status, triggers) {
 
   const lowerTriggers = (triggers || []).map((t) => t.toLowerCase());
 
-  // Reset button (yellow/red).
   if (status === "yellow" || status === "red") {
     addButton(container, "Take a 3-min reset", () => {
       chrome.tabs.create({ url: chrome.runtime.getURL("reset.html") });
@@ -123,14 +216,12 @@ function renderActions(status, triggers) {
     });
   }
 
-  // Close distraction tabs (any "tab" trigger).
   if (lowerTriggers.some((t) => t.includes("tab"))) {
     addButton(container, "Close distraction tabs", () => {
       closeDistractionTabs();
     });
   }
 
-  // Focus mode (switching / spiral).
   if (lowerTriggers.some((t) => t.includes("switching") || t.includes("spiral"))) {
     addButton(container, "Focus for 20 minutes", () => {
       chrome.alarms.create("focusEnd", { delayInMinutes: 20 });
@@ -138,7 +229,6 @@ function renderActions(status, triggers) {
     });
   }
 
-  // Late-night stop time.
   if (lowerTriggers.some((t) => t.includes("late"))) {
     addButton(container, "Set a stop time (30 min)", () => {
       chrome.alarms.create("stopTime", { delayInMinutes: 30 });
@@ -190,7 +280,6 @@ function closeDistractionTabs() {
   });
 }
 
-// --- Sparkline -------------------------------------------------------------
 function renderSparkline(history, status) {
   const canvas = document.getElementById("sparkline");
   if (!canvas || !canvas.getContext) return;
@@ -200,7 +289,6 @@ function renderSparkline(history, status) {
   ctx.clearRect(0, 0, w, h);
 
   if (!history || history.length < 2) {
-    // Flat gray line.
     ctx.beginPath();
     ctx.moveTo(0, h / 2);
     ctx.lineTo(w, h / 2);
@@ -217,7 +305,6 @@ function renderSparkline(history, status) {
   ctx.beginPath();
   history.forEach((entry, i) => {
     const x = (i / (n - 1)) * (w - pad * 2) + pad;
-    // Higher score = more stressed = drawn higher (smaller y).
     const score = Math.max(0, Math.min(100, entry.score || 0));
     const y = h - pad - (score / 100) * (h - pad * 2);
     if (i === 0) ctx.moveTo(x, y);
@@ -229,17 +316,19 @@ function renderSparkline(history, status) {
   ctx.stroke();
 }
 
-// --- Live stats ------------------------------------------------------------
 function loadStats(state) {
-  // Tab count is live from the popup's own query.
   chrome.tabs.query({}, (tabs) => {
     const el = document.getElementById("statTabs");
     if (el) el.textContent = String(tabs.length);
   });
-  // Switch rate / session minutes are background-only; leave as "–" unless we
-  // can derive session minutes from lastUpdated history start.
   const switches = document.getElementById("statSwitches");
   const session = document.getElementById("statSession");
-  if (switches) switches.textContent = "–";
-  if (session) session.textContent = "–";
+  if (switches) {
+    const rate = state && typeof state.switchRatePerMin === "number" ? state.switchRatePerMin : 0;
+    switches.textContent = String(rate);
+  }
+  if (session) {
+    const mins = state && typeof state.sessionMinutes === "number" ? state.sessionMinutes : 0;
+    session.textContent = String(mins);
+  }
 }
