@@ -1,96 +1,97 @@
 import "server-only";
 
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
-import { tmpdir } from "node:os";
 import type { BurnoutAnalysis, BurnoutCheckRecord, BrowserTab, MoodCheckIn } from "@/lib/types";
 import { generateId } from "@/lib/utils";
-
-const fallbackFile = process.env.VERCEL
-  ? join(tmpdir(), "custod-checks.json")
-  : join(process.cwd(), ".custod-data", "checks.json");
-
-type Store = {
-  checks: Record<string, BurnoutCheckRecord>;
-  shares: Record<string, string>;
-};
-
-const g = globalThis as unknown as { __custodStore?: Store };
-
-function memory(): Store {
-  if (!g.__custodStore) {
-    g.__custodStore = { checks: {}, shares: {} };
-  }
-  return g.__custodStore;
-}
-
-async function loadStore(): Promise<void> {
-  try {
-    const raw = await readFile(fallbackFile, "utf8");
-    const parsed = JSON.parse(raw) as Partial<Store>;
-    const store = memory();
-    store.checks = { ...store.checks, ...(parsed.checks ?? {}) };
-    store.shares = { ...store.shares, ...(parsed.shares ?? {}) };
-    for (const check of Object.values(store.checks)) {
-      if (check.shareSlug) store.shares[check.shareSlug] = check.id;
-    }
-  } catch {
-    // No local store yet.
-  }
-}
-
-async function flushStore(): Promise<void> {
-  await mkdir(dirname(fallbackFile), { recursive: true });
-  await writeFile(fallbackFile, JSON.stringify(memory()), "utf8");
-}
+import { supabase } from "@/lib/supabase";
 
 export async function createCheck(input: {
   rawTabs: BrowserTab[];
   mood?: MoodCheckIn;
   analysis: BurnoutAnalysis;
 }): Promise<BurnoutCheckRecord> {
-  await loadStore();
   const record: BurnoutCheckRecord = {
     id: generateId(),
     createdAt: new Date().toISOString(),
     rawTabs: input.rawTabs,
     mood: input.mood,
-    analysis: input.analysis
+    analysis: input.analysis,
   };
-  memory().checks[record.id] = record;
-  await flushStore();
+
+  const { error } = await supabase.from("checks").insert({
+    id: record.id,
+    created_at: record.createdAt,
+    raw_tabs: record.rawTabs,
+    mood: record.mood ?? null,
+    analysis: record.analysis,
+    share_slug: null,
+  });
+
+  if (error) throw new Error(error.message);
   return record;
 }
 
 export async function getCheck(id: string): Promise<BurnoutCheckRecord | null> {
-  await loadStore();
-  return memory().checks[id] ?? null;
+  const { data, error } = await supabase
+    .from("checks")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  return data ? rowToRecord(data) : null;
 }
 
 export async function listChecks(limit = 20): Promise<BurnoutCheckRecord[]> {
-  await loadStore();
-  return Object.values(memory().checks)
-    .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
-    .slice(0, limit);
+  const { data, error } = await supabase
+    .from("checks")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  if (error) throw new Error(error.message);
+  return (data ?? []).map(rowToRecord);
 }
 
 export async function ensureShareSlug(id: string): Promise<string | null> {
-  await loadStore();
-  const check = memory().checks[id];
-  if (!check) return null;
-  if (check.shareSlug) return check.shareSlug;
-  let slug = generateId().replace(/-/g, "").slice(0, 10);
-  while (memory().shares[slug]) {
-    slug = generateId().replace(/-/g, "").slice(0, 10);
-  }
-  check.shareSlug = slug;
-  memory().shares[slug] = id;
-  await flushStore();
+  const { data: existing, error: fetchErr } = await supabase
+    .from("checks")
+    .select("share_slug")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (fetchErr) throw new Error(fetchErr.message);
+  if (!existing) return null;
+  if (existing.share_slug) return existing.share_slug;
+
+  const slug = generateId().replace(/-/g, "").slice(0, 10);
+
+  const { error: updateErr } = await supabase
+    .from("checks")
+    .update({ share_slug: slug })
+    .eq("id", id);
+
+  if (updateErr) throw new Error(updateErr.message);
   return slug;
 }
 
 export async function getCheckBySlug(slug: string): Promise<BurnoutCheckRecord | null> {
-  await loadStore();
-  const id = memory().shares[slug];
-  return id ? memory().checks[id] ?? null : null;
+  const { data, error } = await supabase
+    .from("checks")
+    .select("*")
+    .eq("share_slug", slug)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  return data ? rowToRecord(data) : null;
+}
+
+function rowToRecord(row: Record<string, unknown>): BurnoutCheckRecord {
+  return {
+    id: row.id as string,
+    createdAt: row.created_at as string,
+    rawTabs: row.raw_tabs as BrowserTab[],
+    mood: row.mood as MoodCheckIn | undefined,
+    analysis: row.analysis as BurnoutAnalysis,
+    shareSlug: row.share_slug as string | undefined,
+  };
 }
