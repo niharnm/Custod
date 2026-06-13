@@ -31,14 +31,25 @@ Custod does not read page contents, screenshots, cookies, passwords, keystrokes,
 
 ## Repo Layout
 
+This repo is a monorepo holding every Custod surface. The **root** is the canonical
+web app (what deploys to Vercel); the other surfaces live in self-contained folders.
+
 ```text
 Custod/
-  app/                  Next.js App Router pages and API routes
+  app/                  Next.js App Router pages and API routes  ← canonical web app (root)
   components/           Dashboard and capture UI
   lib/                  Analyzer, storage, markdown export, shared types
-  extension/            Chrome extension
+  supabase/             Database schema and RLS policies
+  extension/            Chrome extension (Vite + TypeScript)
+  macos/                Native macOS app (SwiftUI / Xcode project)
+  website/              Marketing site (separate Next.js app; own deps & stack)
+  docs/                 Product, architecture, API, privacy, and roadmap docs
   vercel.json           Vercel framework config
 ```
+
+Each of `extension/`, `macos/`, and `website/` is independent — its own toolchain and
+dependencies. They are excluded from the root TypeScript and ESLint configs so the root
+app's `typecheck` / `lint` / `build` only cover the web app.
 
 ## Run Locally
 
@@ -76,6 +87,24 @@ VITE_WEB_APP_URL=https://your-custod-deploy.vercel.app npm run build
 ```
 
 Keep `extension/manifest.json` host permissions aligned with the deployed app domain.
+
+## macOS App
+
+A native SwiftUI app lives in `macos/`. Open `macos/Custod/Custodt.xcodeproj` in Xcode
+and run the `Custodt` scheme. It mirrors the burnout-signal model natively (tab import,
+usage tracking, burnout analysis, notifications).
+
+## Marketing Website
+
+The marketing site in `website/` is a separate Next.js app with its own dependency tree
+(Next 16 / React 19 / Tailwind 4 / shadcn). It is intentionally not merged into the root
+app — run it independently:
+
+```bash
+cd website
+npm install
+npm run dev
+```
 
 ## Storage
 
