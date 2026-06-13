@@ -1,5 +1,4 @@
 import { notFound } from "next/navigation";
-import { Header } from "@/components/Header";
 import { BurnoutDashboard } from "@/components/BurnoutDashboard";
 import { getCheck, listChecks } from "@/lib/storage";
 
@@ -11,10 +10,5 @@ export default async function CheckPage({ params }: { params: Promise<{ id: stri
   if (!check) notFound();
   const history = await listChecks(12);
 
-  return (
-    <main>
-      <Header />
-      <BurnoutDashboard check={check} history={history} />
-    </main>
-  );
+  return <BurnoutDashboard check={check} history={history} />;
 }

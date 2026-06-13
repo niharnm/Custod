@@ -3,17 +3,17 @@ import { Activity, Shield } from "lucide-react";
 
 export function Header() {
   return (
-    <header className="border-b bg-white/85 backdrop-blur">
-      <div className="shell flex min-h-16 items-center justify-between gap-4">
-        <Link href="/" className="flex items-center gap-3 font-semibold">
-          <span className="grid h-9 w-9 place-items-center rounded-lg bg-primary text-primary-foreground">
-            <Activity className="h-5 w-5" />
+    <header className="sticky top-0 z-50 border-b border-[hsl(var(--border))] bg-[hsl(var(--bg)/0.8)] backdrop-blur-xl">
+      <div className="shell flex min-h-[60px] items-center justify-between gap-4">
+        <Link href="/" className="flex items-center gap-3 group">
+          <span className="grid h-8 w-8 place-items-center rounded-lg bg-[hsl(var(--primary))] shadow-[0_0_20px_hsl(var(--primary)/0.5)] transition-all group-hover:shadow-[0_0_28px_hsl(var(--primary)/0.7)]">
+            <Activity className="h-4 w-4 text-white" />
           </span>
-          <span className="text-lg tracking-tight">Custod</span>
+          <span className="text-[15px] font-semibold tracking-tight text-[hsl(var(--foreground))]">Custod</span>
         </Link>
-        <div className="hidden items-center gap-2 rounded-full border bg-muted px-3 py-1.5 text-xs font-medium text-muted-foreground sm:flex">
-          <Shield className="h-3.5 w-3.5" />
-          Titles and URLs only
+        <div className="flex items-center gap-1.5 rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--surface-2))] px-3 py-1.5 text-xs font-medium text-[hsl(var(--muted-foreground))]">
+          <Shield className="h-3 w-3" />
+          Titles &amp; URLs only — no page content
         </div>
       </div>
     </header>
