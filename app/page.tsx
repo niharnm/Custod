@@ -1,16 +1,10 @@
 import { Header } from "@/components/Header";
 import { BrowserCaptureForm } from "@/components/BrowserCaptureForm";
 import { StatusBadge } from "@/components/StatusBadge";
-import { listChecks } from "@/lib/storage";
-import { formatDate, statusColor } from "@/lib/utils";
-import Link from "next/link";
-import { ArrowRight, Zap } from "lucide-react";
+import { RecentScans } from "@/components/RecentScans";
+import { Zap } from "lucide-react";
 
-export const dynamic = "force-dynamic";
-
-export default async function HomePage() {
-  const history = await listChecks(8);
-
+export default function HomePage() {
   return (
     <div className="min-h-screen">
       <Header />
@@ -91,38 +85,7 @@ export default async function HomePage() {
             </div>
           </div>
 
-          {history.length === 0 ? (
-            <div className="mt-5 flex flex-col items-center justify-center rounded-xl border border-dashed border-[hsl(var(--border))] py-12 text-center">
-              <div className="h-10 w-10 rounded-full bg-[hsl(var(--surface-2))] flex items-center justify-center mb-3">
-                <Zap className="h-5 w-5 text-[hsl(var(--muted-foreground))]" />
-              </div>
-              <p className="text-sm font-medium text-[hsl(var(--foreground))]">No checks yet</p>
-              <p className="caption mt-1">Run your first check above to start building a trend.</p>
-            </div>
-          ) : (
-            <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              {history.map((check) => (
-                <Link
-                  key={check.id}
-                  href={`/check/${check.id}`}
-                  className="group panel-inner flex flex-col gap-3 p-4 transition-all hover:border-[hsl(var(--primary)/0.4)] hover:bg-[hsl(var(--surface-3))]"
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className={`text-xs font-bold uppercase tracking-widest ${statusColor(check.analysis.status)}`}>
-                      {check.analysis.status}
-                    </span>
-                    <ArrowRight className="h-3.5 w-3.5 text-[hsl(var(--muted-foreground))] opacity-0 transition-opacity group-hover:opacity-100" />
-                  </div>
-                  <div className={`text-3xl font-bold ${statusColor(check.analysis.status)}`}>
-                    {check.analysis.score}
-                    <span className="text-base font-normal text-[hsl(var(--muted-foreground))]">/100</span>
-                  </div>
-                  <p className="caption line-clamp-2">{check.analysis.mainPattern}</p>
-                  <span className="caption mt-auto">{formatDate(check.createdAt)}</span>
-                </Link>
-              ))}
-            </div>
-          )}
+          <RecentScans />
         </div>
       </section>
     </div>

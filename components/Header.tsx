@@ -1,6 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
-import { Shield } from "lucide-react";
+import { Shield, LineChart, Settings } from "lucide-react";
 
 export function Header() {
   return (
@@ -12,9 +12,22 @@ export function Header() {
           </span>
           <span className="text-[15px] font-semibold tracking-tight text-[hsl(var(--foreground))]">Custod</span>
         </Link>
-        <div className="flex items-center gap-1.5 rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--surface-2))] px-3 py-1.5 text-xs font-medium text-[hsl(var(--muted-foreground))]">
-          <Shield className="h-3 w-3" />
-          Titles &amp; URLs only — no page content
+        <div className="flex items-center gap-2">
+          <nav className="hidden items-center gap-1 sm:flex">
+            <Link href="/trends" className="button-ghost text-xs gap-1.5">
+              <LineChart className="h-3.5 w-3.5" />
+              Trends
+            </Link>
+            <Link href="/settings" className="button-ghost text-xs gap-1.5">
+              <Settings className="h-3.5 w-3.5" />
+              Settings
+            </Link>
+          </nav>
+          <div className="flex items-center gap-1.5 rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--surface-2))] px-3 py-1.5 text-xs font-medium text-[hsl(var(--muted-foreground))]">
+            <Shield className="h-3 w-3" />
+            <span className="hidden md:inline">Titles &amp; URLs only — no page content</span>
+            <span className="md:hidden">Private</span>
+          </div>
         </div>
       </div>
     </header>

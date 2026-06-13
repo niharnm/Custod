@@ -138,3 +138,148 @@ button:disabled {
   font-size: 12px;
   line-height: 1.45;
 }
+
+.link {
+  border: 0;
+  background: none;
+  padding: 0;
+  color: #173f7a;
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.result {
+  display: grid;
+  gap: 8px;
+  border: 1px solid #e3e8f0;
+  border-radius: 11px;
+  background: white;
+  padding: 12px;
+}
+
+.result-head {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+
+.light {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-shadow: 0 0 0 4px rgba(0, 0, 0, 0.04);
+}
+
+.light-green {
+  background: #16a34a;
+}
+
+.light-yellow {
+  background: #eab308;
+}
+
+.light-red {
+  background: #dc2626;
+}
+
+.result-status {
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.result-score {
+  margin-top: 2px;
+  color: #667085;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.result-pattern {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.result-explain {
+  color: #475467;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.park {
+  display: grid;
+  gap: 8px;
+}
+
+.hint {
+  color: #667085;
+  font-size: 12px;
+}
+
+.parked {
+  border: 1px solid #e3e8f0;
+  border-radius: 11px;
+  background: white;
+  padding: 10px 12px;
+}
+
+.parked-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.parked ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 7px;
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.parked li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 12px;
+}
+
+.parked-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.checkin {
+  border: 1px solid #e3e8f0;
+  border-radius: 11px;
+  background: white;
+  padding: 10px 12px;
+}
+
+.checkin summary {
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+  list-style: none;
+}
+
+.checkin summary::-webkit-details-marker {
+  display: none;
+}
+
+.checkin[open] summary {
+  margin-bottom: 11px;
+}
+
+.checkin label {
+  margin-bottom: 11px;
+}

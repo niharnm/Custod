@@ -4,7 +4,8 @@ import { FormEvent, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, ScanLine, Plug } from "lucide-react";
 import { parseTabsInput } from "@/lib/utils";
-import type { BrowserTab } from "@/lib/types";
+import { apiFetch, ensureDeviceRegistered } from "@/lib/device";
+import type { BrowserTab, MoodCheckInValue } from "@/lib/types";
 
 const WEB_SOURCE = "custod-web";
 const EXTENSION_SOURCE = "custod-extension";
@@ -20,6 +21,14 @@ type ExtensionResponse = {
   error?: string;
 };
 
+const MOODS: { value: MoodCheckInValue; label: string }[] = [
+  { value: "calm", label: "Calm" },
+  { value: "stressed", label: "Stressed" },
+  { value: "overwhelmed", label: "Overwhelmed" },
+  { value: "numb", label: "Numb" },
+  { value: "skip", label: "Skip" },
+];
+
 function requestId() {
   return globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
 }
@@ -28,18 +37,12 @@ function formatTabs(tabs: BrowserTab[]) {
   return tabs.map((t) => `${t.title || t.url}${t.url ? ` - ${t.url}` : ""}`).join("\n");
 }
 
-const SLIDER_LABELS: Record<string, string[]> = {
-  energy: ["Drained", "", "Neutral", "", "Steady"],
-  stress: ["Low", "", "Moderate", "", "High"],
-};
-
 export function BrowserCaptureForm() {
   const router = useRouter();
   const [rawTabs, setRawTabs] = useState("");
-  const [energy, setEnergy] = useState("3");
-  const [stress, setStress] = useState("3");
-  const [timePressure, setTimePressure] = useState<"none" | "some" | "high">("some");
-  const [reflection, setReflection] = useState("");
+  const [mood, setMood] = useState<MoodCheckInValue>("skip");
+  const [goal, setGoal] = useState("");
+  const [timeRemaining, setTimeRemaining] = useState("");
   const [loading, setLoading] = useState(false);
   const [importing, setImporting] = useState(false);
   const [message, setMessage] = useState("");
@@ -91,14 +94,20 @@ export function BrowserCaptureForm() {
     if (parsedTabs.length === 0) { setError("Add at least one tab title or URL."); return; }
     setLoading(true);
     try {
-      const res = await fetch("/api/analyze", {
+      await ensureDeviceRegistered();
+      const res = await apiFetch("/api/scans", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tabs: parsedTabs, mood: { energy: Number(energy), stress: Number(stress), timePressure, reflection } }),
+        body: JSON.stringify({
+          tabs: parsedTabs,
+          moodCheckIn: mood,
+          goal: goal.trim() || undefined,
+          timeRemaining: timeRemaining.trim() || undefined,
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Analysis failed.");
-      router.push(`/check/${data.check.id}`);
+      router.push(`/scan/${data.scanId}`);
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Analysis failed.");
@@ -125,7 +134,7 @@ export function BrowserCaptureForm() {
         <textarea
           value={rawTabs}
           onChange={(e) => setRawTabs(e.target.value)}
-          rows={9}
+          rows={8}
           className="input resize-y font-mono text-xs leading-relaxed"
           placeholder={"One tab per line:\nCanvas — Assignments\nhttps://mail.google.com\nYouTube - how to study better"}
         />
@@ -136,58 +145,49 @@ export function BrowserCaptureForm() {
         </p>
       </div>
 
-      {/* Mood sliders */}
-      <div className="grid gap-4 sm:grid-cols-2">
-        {(["energy", "stress"] as const).map((field) => {
-          const val = field === "energy" ? energy : stress;
-          const set = field === "energy" ? setEnergy : setStress;
-          const label = SLIDER_LABELS[field][Number(val) - 1];
-          return (
-            <div key={field}>
-              <div className="flex items-center justify-between mb-2">
-                <span className="label capitalize">{field}</span>
-                <span className="text-xs font-semibold text-[hsl(var(--primary))]">{val}/5 — {label}</span>
-              </div>
-              <input
-                type="range" min="1" max="5" step="1"
-                value={val} onChange={(e) => set(e.target.value)}
-                className="w-full accent-[hsl(var(--primary))] cursor-pointer"
-              />
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Time pressure */}
+      {/* Mood check-in */}
       <div>
-        <label className="label mb-2 block">Time pressure</label>
-        <div className="grid grid-cols-3 gap-2">
-          {(["none", "some", "high"] as const).map((v) => (
+        <label className="label mb-2 block">How are you feeling? <span className="caption font-normal">(optional, ~5s)</span></label>
+        <div className="flex flex-wrap gap-2">
+          {MOODS.map((m) => (
             <button
-              key={v} type="button"
-              onClick={() => setTimePressure(v)}
-              className={`rounded-xl border px-3 py-2 text-xs font-semibold capitalize transition-all ${
-                timePressure === v
+              key={m.value}
+              type="button"
+              onClick={() => setMood(m.value)}
+              className={`rounded-xl border px-3 py-2 text-xs font-semibold transition-all ${
+                mood === m.value
                   ? "border-[hsl(var(--primary)/0.6)] bg-[hsl(var(--primary)/0.15)] text-[hsl(var(--primary))]"
                   : "border-[hsl(var(--border))] bg-[hsl(var(--surface-2))] text-[hsl(var(--muted-foreground))] hover:border-[hsl(var(--primary)/0.3)]"
               }`}
             >
-              {v === "none" ? "None" : v === "some" ? "Some" : "High"}
+              {m.label}
             </button>
           ))}
         </div>
       </div>
 
-      {/* Reflection */}
-      <div>
-        <label className="label mb-2 block">Reflection <span className="caption font-normal">(optional)</span></label>
-        <textarea
-          value={reflection}
-          onChange={(e) => setReflection(e.target.value)}
-          rows={3}
-          className="input resize-none"
-          placeholder="What feels stuck or urgent right now?"
-        />
+      {/* Goal + time */}
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div>
+          <label className="label mb-2 block">What are you working on? <span className="caption font-normal">(optional)</span></label>
+          <input
+            value={goal}
+            onChange={(e) => setGoal(e.target.value)}
+            maxLength={240}
+            className="input"
+            placeholder="e.g. finish history essay"
+          />
+        </div>
+        <div>
+          <label className="label mb-2 block">Time left <span className="caption font-normal">(optional)</span></label>
+          <input
+            value={timeRemaining}
+            onChange={(e) => setTimeRemaining(e.target.value)}
+            maxLength={80}
+            className="input"
+            placeholder="e.g. 2h, 30m"
+          />
+        </div>
       </div>
 
       {message && (
@@ -198,7 +198,7 @@ export function BrowserCaptureForm() {
       )}
 
       <div className="flex items-center justify-between gap-4 pt-1">
-        <p className="caption max-w-xs">Not a diagnosis. Pattern detection only.</p>
+        <p className="caption max-w-xs">A signal, not a diagnosis. Pattern detection only.</p>
         <button type="submit" disabled={loading} className="button-primary">
           {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ScanLine className="h-4 w-4" />}
           Run check
