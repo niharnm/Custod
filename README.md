@@ -31,29 +31,25 @@ Custod does not read page contents, screenshots, cookies, passwords, keystrokes,
 
 ## Repo Layout
 
-This repo is a monorepo holding every Custod surface. The **root** is the canonical
-web app (what deploys to Vercel); the other surfaces live in self-contained folders.
+This repo is a monorepo holding every Custod surface. **`website/`** is the canonical
+web app (marketing + product + API). It deploys to Vercel from the repo root via
+[`vercel.json`](vercel.json).
 
 ```text
 Custod/
-  app/                  Next.js App Router pages and API routes  ← canonical web app (root)
-  components/           Dashboard and capture UI
-  lib/                  Analyzer, storage, markdown export, shared types
-  supabase/             Database schema and RLS policies
-  extension/            Chrome extension (Vite + TypeScript)
+  website/              Next.js app — marketing, product UI, API routes  ← canonical web app
+  website/extension/    Chrome extension (Vite + TypeScript)
   macos/                Native macOS app (SwiftUI / Xcode project)
-  website/              Marketing site (separate Next.js app; own deps & stack)
+  supabase/             Database schema and RLS policies (also copied under website/)
+  app/                  Deprecated root app — see app/README.md
   docs/                 Product, architecture, API, privacy, and roadmap docs
-  vercel.json           Vercel framework config
+  vercel.json           Points Vercel builds at website/
 ```
-
-Each of `extension/`, `macos/`, and `website/` is independent — its own toolchain and
-dependencies. They are excluded from the root TypeScript and ESLint configs so the root
-app's `typecheck` / `lint` / `build` only cover the web app.
 
 ## Run Locally
 
 ```bash
+cd website
 npm install
 npm run dev
 ```
@@ -63,9 +59,8 @@ Open `http://localhost:3000`.
 Useful checks:
 
 ```bash
-npm run typecheck
-npm run lint
-npm run build
+cd website
+npm run check
 ```
 
 ## Chrome Extension
@@ -73,20 +68,21 @@ npm run build
 The extension collects the current Chrome window's HTTP and HTTPS tabs and sends titles and URLs to the configured Custod web app.
 
 ```bash
-cd extension
+cd website/extension
 npm install
 VITE_WEB_APP_URL=http://localhost:3000 npm run build
 ```
 
-Load `extension/dist` in `chrome://extensions` with Developer Mode enabled.
+Load `website/extension/dist` in `chrome://extensions` with Developer Mode enabled.
 
 For production, build with the deployed URL:
 
 ```bash
+cd website/extension
 VITE_WEB_APP_URL=https://your-custod-deploy.vercel.app npm run build
 ```
 
-Keep `extension/manifest.json` host permissions aligned with the deployed app domain.
+Keep `website/extension/manifest.json` host permissions aligned with the deployed app domain.
 
 ## macOS App
 
@@ -96,15 +92,16 @@ usage tracking, burnout analysis, notifications).
 
 ## Marketing Website
 
-The marketing site in `website/` is a separate Next.js app with its own dependency tree
-(Next 16 / React 19 / Tailwind 4 / shadcn). It is intentionally not merged into the root
-app — run it independently:
+The `website/` app serves both the public marketing site and the full product (check flow,
+scan results, trends, settings, API). Run it independently:
 
 ```bash
 cd website
 npm install
 npm run dev
 ```
+
+Routes include `/`, `/download`, `/login`, `/dashboard`, `/check`, `/scan/[id]`, `/trends`, `/settings`, and `/api/*`.
 
 ## Storage
 
@@ -130,7 +127,8 @@ AI keys are optional. If neither key exists, Custod still returns a full determi
 
 ## Deploy To Vercel
 
-The web app is at the repository root, so Vercel can auto-detect Next.js. Set this optional env var for absolute share links:
+Vercel builds from the repo root using [`vercel.json`](vercel.json), which runs `website/`.
+Set this optional env var for absolute share links:
 
 ```bash
 NEXT_PUBLIC_APP_URL=https://your-custod-deploy.vercel.app

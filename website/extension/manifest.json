@@ -17,6 +17,18 @@
   ],
   "action": {
     "default_title": "Custod",
-    "default_popup": "index.html"
+    "default_popup": "index.html",
+    "default_icon": {
+      "16": "icons/icon.svg",
+      "32": "icons/icon.svg",
+      "48": "icons/icon.svg",
+      "128": "icons/icon.svg"
+    }
+  },
+  "icons": {
+    "16": "icons/icon.svg",
+    "32": "icons/icon.svg",
+    "48": "icons/icon.svg",
+    "128": "icons/icon.svg"
   }
 }

@@ -15,7 +15,7 @@ Custod does not read page contents, messages, emails, passwords, keystrokes, scr
 
 ## Web App
 
-The deployed web app is a Next.js app under `src/`.
+The canonical Next.js app lives in this folder (`website/`).
 
 ```bash
 npm install
@@ -35,28 +35,44 @@ npm run check
 
 ## Routes
 
-- `/` - public marketing site
-- `/privacy` - privacy policy
-- `/terms` - terms of service
-- `/login` - Supabase email/password login
-- `/dashboard` - gated dashboard shell
-- `/download` - extension and app download entry point
+**Marketing**
+
+- `/` — public marketing site
+- `/privacy` — privacy policy
+- `/terms` — terms of service
+- `/download` — extension and Mac app install instructions
+- `/login` — Supabase email/password login
+- `/dashboard` — gated overview with live scan data
+
+**Product**
+
+- `/check` — run a burnout check (tab capture + mood check-in)
+- `/scan/[id]` — scan results dashboard
+- `/trends` — score history and achievements
+- `/settings` — privacy controls and data export
+- `/share/[slug]` — public shared scan summary
+
+**API** — see root [`README.md`](../README.md#api) for the full route table.
 
 ## Repo Layout
 
 ```text
-src/          Next.js website and shared web components
-extension/    Chrome extension source
-macos/        macOS app source
-supabase/     Supabase schema and database setup
-docs/         Product, architecture, API, and privacy notes
+src/              Next.js website, product UI, and API routes
+extension/        Chrome extension source
+supabase/         Supabase schema and database setup
+../macos/         macOS app source (canonical copy at repo root)
+docs/             Product, architecture, API, and privacy notes
 ```
+
+## Design System
+
+Warm cream/amber/rose palette defined in `src/app/globals.css` and `src/lib/design-tokens.ts`.
+Shared UI primitives live in `src/components/custod/ui/`.
 
 ## Deployment
 
-Production is deployed from `master` to Vercel. Push only verified changes.
-
-Before pushing:
+Production deploys from the repo root via `vercel.json`, which builds this folder.
+Push only verified changes:
 
 ```bash
 npm run check

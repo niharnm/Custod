@@ -43,33 +43,26 @@ private struct MenuBarPanel: View {
     @EnvironmentObject private var settings: SettingsStore
     @Environment(\.openWindow) private var openWindow
 
-    private func statusColor(_ s: BurnoutStatus) -> Color {
-        switch s {
-        case .green:  return Color(red: 0.13, green: 0.72, blue: 0.52)
-        case .yellow: return Color(red: 0.98, green: 0.70, blue: 0.10)
-        case .red:    return Color(red: 0.93, green: 0.31, blue: 0.27)
-        }
-    }
-
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 10) {
                 ScoreDot(score: monitor.analysis?.score ?? 0,
-                         color: monitor.analysis.map { statusColor($0.status) } ?? .secondary)
+                         color: monitor.analysis.map { statusColor($0.status) } ?? CustodTheme.muted)
                 VStack(alignment: .leading, spacing: 1) {
                     Text(monitor.analysis?.mainPattern ?? "Monitoring your focus")
                         .font(.system(.subheadline, design: .rounded).weight(.semibold))
+                        .foregroundStyle(CustodTheme.brown)
                     Text(monitor.isActive ? "Real-time monitoring on" : "Monitoring paused")
-                        .font(.system(.caption, design: .rounded)).foregroundStyle(.secondary)
+                        .font(.system(.caption, design: .rounded)).foregroundStyle(CustodTheme.muted)
                 }
             }
 
             if let t = monitor.lastChecked {
                 Text("Last check \(t.formatted(date: .omitted, time: .shortened)) · \(monitor.tabs.count) tabs")
-                    .font(.system(.caption2, design: .rounded)).foregroundStyle(.tertiary)
+                    .font(.system(.caption2, design: .rounded)).foregroundStyle(CustodTheme.muted)
             }
 
-            Divider()
+            Divider().overlay(CustodTheme.taupe.opacity(0.5))
 
             Button {
                 openWindow(id: "main")
@@ -90,7 +83,7 @@ private struct MenuBarPanel: View {
                 Label("Check now", systemImage: "arrow.clockwise")
             }
 
-            Divider()
+            Divider().overlay(CustodTheme.taupe.opacity(0.5))
 
             Button { NSApplication.shared.terminate(nil) } label: {
                 Label("Quit Custod", systemImage: "power")
@@ -98,6 +91,7 @@ private struct MenuBarPanel: View {
         }
         .padding(14)
         .frame(width: 280)
+        .background(CustodTheme.cream)
     }
 }
 
@@ -106,7 +100,8 @@ private struct ScoreDot: View {
     let color: Color
     var body: some View {
         ZStack {
-            Circle().fill(color.opacity(0.16)).frame(width: 40, height: 40)
+            Circle().fill(color.opacity(0.2)).frame(width: 40, height: 40)
+                .shadow(color: color.opacity(0.35), radius: 6)
             Text("\(score)").font(.system(.subheadline, design: .rounded).weight(.bold)).foregroundStyle(color)
         }
     }

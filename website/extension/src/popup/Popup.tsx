@@ -1,14 +1,22 @@
 import { useEffect, useState } from "react";
-import { analyzeBurnout, checkUrl } from "../lib/api";
+import { StatusLamp } from "../components/StatusLamp";
+import { createScan, scanUrl, type MoodCheckInValue } from "../lib/api";
 import { collectTabs } from "../lib/collectTabs";
 import { WEB_APP_URL } from "../lib/config";
 
+const MOODS: { value: MoodCheckInValue; label: string }[] = [
+  { value: "calm", label: "Calm" },
+  { value: "stressed", label: "Stressed" },
+  { value: "overwhelmed", label: "Overwhelmed" },
+  { value: "numb", label: "Numb" },
+  { value: "skip", label: "Skip" },
+];
+
 export function Popup() {
   const [tabCount, setTabCount] = useState(0);
-  const [energy, setEnergy] = useState("3");
-  const [stress, setStress] = useState("3");
-  const [timePressure, setTimePressure] = useState<"none" | "some" | "high">("some");
-  const [reflection, setReflection] = useState("");
+  const [mood, setMood] = useState<MoodCheckInValue>("skip");
+  const [goal, setGoal] = useState("");
+  const [timeRemaining, setTimeRemaining] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -25,20 +33,13 @@ export function Popup() {
       const tabs = await collectTabs();
       setTabCount(tabs.length);
       if (tabs.length === 0) throw new Error("Open at least one http or https tab first.");
-      await chrome.storage.local.set({
-        "custod:lastTabs": tabs,
-        "custod:lastCheckIn": { energy, stress, timePressure, reflection }
-      });
-      const id = await analyzeBurnout({
+      const id = await createScan({
         tabs,
-        mood: {
-          energy: Number(energy),
-          stress: Number(stress),
-          timePressure,
-          reflection
-        }
+        moodCheckIn: mood,
+        goal: goal.trim() || undefined,
+        timeRemaining: timeRemaining.trim() || undefined,
       });
-      await chrome.tabs.create({ url: checkUrl(id) });
+      await chrome.tabs.create({ url: scanUrl(id) });
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Custod could not run this check.");
     } finally {
@@ -47,63 +48,73 @@ export function Popup() {
   }
 
   async function openDashboard() {
-    await chrome.tabs.create({ url: WEB_APP_URL });
+    await chrome.tabs.create({ url: `${WEB_APP_URL}/check` });
   }
 
   return (
     <main className="popup">
-      <header>
-        <div>
-          <h1>Custod</h1>
-          <p>Browser burnout warning light</p>
+      <header className="popup-header">
+        <div className="brand-row">
+          <StatusLamp status="green" size="sm" />
+          <div>
+            <h1>Custod</h1>
+            <p>Browser burnout warning light</p>
+            <span className="accent-bar" />
+          </div>
         </div>
-        <div className="count">{tabCount}</div>
+        <div className="tab-badge">{tabCount}</div>
       </header>
 
-      <label>
-        <span>Energy</span>
-        <select value={energy} onChange={(event) => setEnergy(event.target.value)} disabled={loading}>
-          <option value="1">1 - drained</option>
-          <option value="2">2</option>
-          <option value="3">3 - neutral</option>
-          <option value="4">4</option>
-          <option value="5">5 - steady</option>
-        </select>
+      <div className="card">
+        <span className="field-label">How are you feeling? (optional)</span>
+        <div className="mood-row">
+          {MOODS.map((m) => (
+            <button
+              key={m.value}
+              type="button"
+              className={`pill${mood === m.value ? " active" : ""}`}
+              onClick={() => setMood(m.value)}
+              disabled={loading}
+            >
+              {m.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <label className="card">
+        <span className="field-label">What are you working on? (optional)</span>
+        <input
+          className="input"
+          value={goal}
+          onChange={(event) => setGoal(event.target.value)}
+          disabled={loading}
+          placeholder="e.g. finish history essay"
+        />
       </label>
 
-      <label>
-        <span>Stress</span>
-        <select value={stress} onChange={(event) => setStress(event.target.value)} disabled={loading}>
-          <option value="1">1 - low</option>
-          <option value="2">2</option>
-          <option value="3">3 - moderate</option>
-          <option value="4">4</option>
-          <option value="5">5 - high</option>
-        </select>
-      </label>
-
-      <label>
-        <span>Time pressure</span>
-        <select value={timePressure} onChange={(event) => setTimePressure(event.target.value as "none" | "some" | "high")} disabled={loading}>
-          <option value="none">None</option>
-          <option value="some">Some</option>
-          <option value="high">High</option>
-        </select>
-      </label>
-
-      <label>
-        <span>Optional reflection</span>
-        <textarea value={reflection} onChange={(event) => setReflection(event.target.value)} disabled={loading} />
+      <label className="card">
+        <span className="field-label">Time left (optional)</span>
+        <input
+          className="input"
+          value={timeRemaining}
+          onChange={(event) => setTimeRemaining(event.target.value)}
+          disabled={loading}
+          placeholder="e.g. 2h, 30m"
+        />
       </label>
 
       {error ? <p className="error">{error}</p> : null}
 
-      <button className="primary" onClick={runCheck} disabled={loading}>
-        {loading ? "Checking..." : "Run burnout check"}
-      </button>
-      <button className="secondary" onClick={openDashboard} disabled={loading}>
-        Open dashboard
-      </button>
+      <div className="btn-row">
+        <button className="btn-primary" onClick={runCheck} disabled={loading}>
+          {loading ? "Checking..." : "Run burnout check"}
+        </button>
+        <button className="btn-secondary" onClick={openDashboard} disabled={loading}>
+          Open dashboard
+        </button>
+      </div>
+
       <p className="privacy">Titles and URLs only. No page contents.</p>
     </main>
   );

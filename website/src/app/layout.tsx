@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Hind, Yusei_Magic } from "next/font/google";
+import { DeviceInit } from "@/components/product/DeviceInit";
 import "./globals.css";
 
 const hind = Hind({
@@ -40,7 +41,10 @@ export default function RootLayout({
       data-scroll-behavior="smooth"
       className={`${hind.variable} ${yuseiMagic.variable} h-full scroll-smooth antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        <DeviceInit />
+        {children}
+      </body>
     </html>
   );
 }

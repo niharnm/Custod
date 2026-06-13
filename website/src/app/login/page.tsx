@@ -4,6 +4,12 @@ import { ArrowLeft, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import {
+  CustodButton,
+  CustodCard,
+  CustodInput,
+  StatusDot,
+} from "@/components/custod/ui";
 import { getSupabaseBrowser, isSupabaseConfigured } from "@/lib/supabase";
 
 type Mode = "signin" | "signup";
@@ -37,13 +43,16 @@ export default function LoginPage() {
     setLoading(true);
     try {
       if (mode === "signup") {
-        const { error } = await supabase.auth.signUp({ email, password });
-        if (error) throw error;
+        const { error: signUpError } = await supabase.auth.signUp({ email, password });
+        if (signUpError) throw signUpError;
         setMessage("Check your inbox to confirm your email, then log in.");
         setMode("signin");
       } else {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw error;
+        const { error: signInError } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+        if (signInError) throw signInError;
         router.replace("/dashboard");
         router.refresh();
         return;
@@ -56,97 +65,98 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="relative flex min-h-screen flex-col items-center justify-center px-5 py-12">
+    <main className="relative flex min-h-screen flex-col items-center justify-center bg-background px-5 py-12">
       <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-72 custod-hero-gradient" />
 
       <Link
         href="/"
-        className="absolute left-5 top-6 inline-flex items-center gap-1.5 text-sm font-medium text-white/90 transition hover:text-white md:left-8"
+        className="absolute left-5 top-6 inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground transition hover:text-foreground md:left-8"
       >
         <ArrowLeft className="size-4" />
         Back
       </Link>
 
       <div className="w-full max-w-md">
-        <div className="mb-8 flex flex-col items-center text-center text-white">
-          <span className="mb-4 grid size-12 place-items-center rounded-2xl bg-white/15 backdrop-blur-sm">
-            <span className="size-3 rounded-full bg-custod-status-green" />
+        <div className="mb-8 flex flex-col items-center text-center">
+          <span className="mb-4 flex items-center gap-2.5 font-heading text-2xl text-foreground">
+            <StatusDot status="green" />
+            Custod
           </span>
-          <h1 className="font-heading text-3xl tracking-tight">
+          <h1 className="font-heading text-3xl tracking-tight text-foreground">
             {mode === "signin" ? "Welcome back" : "Create your Custod account"}
           </h1>
-          <p className="mt-2 text-sm text-white/80">
+          <div className="mt-3 flex justify-center">
+            <span className="custod-accent-bar" />
+          </div>
+          <p className="mt-3 text-sm text-muted-foreground">
             {mode === "signin"
               ? "Log in to see your status history and trend."
               : "Free forever. Your checks stay private to you."}
           </p>
         </div>
 
-        <form
-          onSubmit={submit}
-          className="rounded-3xl border border-[#e2e8f0] bg-white p-6 shadow-xl md:p-8"
-        >
-          {!isSupabaseConfigured && (
-            <p className="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
-              Auth isn&apos;t configured in this environment yet. The form is ready — add
-              Supabase keys to enable accounts.
-            </p>
-          )}
+        <CustodCard className="p-6 md:p-8">
+          <form onSubmit={submit} className="grid gap-4">
+            {!isSupabaseConfigured && (
+              <p className="rounded-xl border border-primary/30 bg-primary/10 px-4 py-3 text-sm text-foreground">
+                Auth isn&apos;t configured in this environment yet. The form is ready — add
+                Supabase keys to enable accounts.
+              </p>
+            )}
 
-          <label className="mb-4 block">
-            <span className="text-sm font-medium text-[#0f172a]">Email</span>
-            <input
+            <CustodInput
+              label="Email"
               type="email"
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="mt-2 w-full rounded-xl border border-[#e2e8f0] bg-[#f8fafc] px-4 py-3 text-sm outline-none transition focus:border-custod-primary focus:bg-white"
               placeholder="you@school.edu"
             />
-          </label>
 
-          <label className="block">
-            <span className="text-sm font-medium text-[#0f172a]">Password</span>
-            <input
+            <CustodInput
+              label="Password"
               type="password"
               required
               minLength={6}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="mt-2 w-full rounded-xl border border-[#e2e8f0] bg-[#f8fafc] px-4 py-3 text-sm outline-none transition focus:border-custod-primary focus:bg-white"
               placeholder="At least 6 characters"
             />
-          </label>
 
-          {error && <p className="mt-4 rounded-xl bg-red-50 px-4 py-2.5 text-sm text-red-600">{error}</p>}
-          {message && <p className="mt-4 rounded-xl bg-green-50 px-4 py-2.5 text-sm text-green-700">{message}</p>}
+            {error ? (
+              <p className="rounded-xl bg-destructive/10 px-4 py-2.5 text-sm text-destructive">
+                {error}
+              </p>
+            ) : null}
+            {message ? (
+              <p className="rounded-xl bg-primary/10 px-4 py-2.5 text-sm text-foreground">
+                {message}
+              </p>
+            ) : null}
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="custod-primary-button mt-6 flex w-full items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-medium text-white transition hover:scale-[1.01] active:scale-[0.98] disabled:opacity-60"
-          >
-            {loading && <Loader2 className="size-4 animate-spin" />}
-            {mode === "signin" ? "Log in" : "Create account"}
-          </button>
+            <CustodButton type="submit" disabled={loading} className="mt-2 w-full">
+              {loading ? <Loader2 className="size-4 animate-spin" /> : null}
+              {mode === "signin" ? "Log in" : "Create account"}
+            </CustodButton>
 
-          <p className="mt-5 text-center text-sm text-custod-muted">
-            {mode === "signin" ? "New to Custod?" : "Already have an account?"}{" "}
-            <button
-              type="button"
-              onClick={() => {
-                setMode(mode === "signin" ? "signup" : "signin");
-                setError("");
-                setMessage("");
-              }}
-              className="font-medium text-custod-primary hover:underline"
-            >
-              {mode === "signin" ? "Create an account" : "Log in"}
-            </button>
-          </p>
-        </form>
+            <p className="text-center text-sm text-muted-foreground">
+              {mode === "signin" ? "New to Custod?" : "Already have an account?"}{" "}
+              <button
+                type="button"
+                onClick={() => {
+                  setMode(mode === "signin" ? "signup" : "signin");
+                  setError("");
+                  setMessage("");
+                }}
+                className="font-medium text-primary hover:underline"
+              >
+                {mode === "signin" ? "Create an account" : "Log in"}
+              </button>
+            </p>
+          </form>
+        </CustodCard>
 
-        <p className="mt-6 text-center text-xs text-custod-muted">
+        <p className="mt-6 text-center text-xs text-muted-foreground">
           Custod notices patterns. It is not medical advice or a diagnosis.
         </p>
       </div>

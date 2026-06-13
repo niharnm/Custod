@@ -2,30 +2,13 @@
 
 import { useEffect, useState } from "react";
 import type { StatusLevel } from "@/types/custod";
+import { STATUS_CONFIG } from "@/lib/design-tokens";
 import { cn } from "@/lib/utils";
 
-const STATUS_CONFIG: Record<
-  StatusLevel,
-  { core: string; glow: string; label: string; pulseClass: string }
-> = {
-  green: {
-    core: "var(--custod-status-green)",
-    glow: "var(--custod-status-green-glow)",
-    label: "Healthy",
-    pulseClass: "",
-  },
-  yellow: {
-    core: "var(--custod-status-yellow)",
-    glow: "var(--custod-status-yellow-glow)",
-    label: "Caution",
-    pulseClass: "animate-[custod-pulse-amber_2s_ease-in-out_infinite]",
-  },
-  red: {
-    core: "var(--custod-status-red)",
-    glow: "var(--custod-status-red-glow)",
-    label: "Burnout risk",
-    pulseClass: "animate-[custod-pulse-red_0.8s_ease-in-out_infinite]",
-  },
+const STATUS_PULSE: Record<StatusLevel, string> = {
+  green: "",
+  yellow: "animate-[custod-pulse-amber_2s_ease-in-out_infinite]",
+  red: "animate-[custod-pulse-red_0.8s_ease-in-out_infinite]",
 };
 
 interface StatusLampProps {
@@ -67,7 +50,7 @@ export function StatusLamp({
           className={cn(
             "absolute rounded-full blur-xl",
             sizeClasses[size],
-            config.pulseClass,
+            STATUS_PULSE[status],
           )}
           style={{ backgroundColor: config.glow }}
         />
@@ -77,7 +60,7 @@ export function StatusLamp({
             sizeClasses[size],
           )}
           style={{
-            backgroundColor: config.core,
+            backgroundColor: config.color,
             boxShadow: `0 0 28px ${config.glow}, inset 0 2px 6px rgb(255 255 255 / 35%)`,
           }}
         />
@@ -85,7 +68,7 @@ export function StatusLamp({
       {showLabel ? (
         <span
           className="text-xs font-semibold uppercase tracking-[0.15em]"
-          style={{ color: config.core }}
+          style={{ color: config.color }}
         >
           {config.label}
         </span>
@@ -106,13 +89,11 @@ export function StatusDot({
     <span
       className={cn("inline-block size-2.5 shrink-0 rounded-full", className)}
       style={{
-        backgroundColor: config.core,
+        backgroundColor: config.color,
         boxShadow: `0 0 8px ${config.glow}`,
       }}
     />
   );
 }
 
-export function getStatusColor(status: StatusLevel): string {
-  return STATUS_CONFIG[status].core;
-}
+export { getStatusColor } from "@/lib/design-tokens";

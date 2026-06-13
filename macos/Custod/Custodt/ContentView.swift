@@ -8,30 +8,7 @@ import Combine
 // dashboard, settings, and history. An autopilot reset break can take over the
 // whole window when Custod decides to step in.
 
-// MARK: - Theme
-
-private extension Color {
-    static let brand = Color(red: 0.07, green: 0.73, blue: 0.60)   // Grammarly-ish teal-green
-    static let warn  = Color(red: 0.98, green: 0.55, blue: 0.10)
-}
-
-private func statusColor(_ s: BurnoutStatus) -> Color {
-    switch s {
-    case .green:  return Color(red: 0.13, green: 0.72, blue: 0.52)
-    case .yellow: return Color(red: 0.98, green: 0.70, blue: 0.10)
-    case .red:    return Color(red: 0.93, green: 0.31, blue: 0.27)
-    }
-}
-
-private func riskColor(_ level: RiskLevel) -> Color {
-    switch level {
-    case .low:    return Color(red: 0.13, green: 0.72, blue: 0.52)
-    case .medium: return Color(red: 0.98, green: 0.70, blue: 0.10)
-    case .high:   return Color(red: 0.93, green: 0.31, blue: 0.27)
-    }
-}
-
-// MARK: - Reusable pieces
+// MARK: - Theme (see Theme.swift)
 
 private struct Card<Content: View>: View {
     @ViewBuilder var content: Content
@@ -40,10 +17,10 @@ private struct Card<Content: View>: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(20)
             .background(RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .fill(Color(nsColor: .controlBackgroundColor)))
+                .fill(CustodTheme.surface))
             .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .strokeBorder(Color.primary.opacity(0.06), lineWidth: 1))
-            .shadow(color: .black.opacity(0.04), radius: 10, y: 3)
+                .strokeBorder(CustodTheme.taupe.opacity(0.55), lineWidth: 1))
+            .shadow(color: CustodTheme.brown.opacity(0.06), radius: 10, y: 3)
     }
 }
 
@@ -107,7 +84,7 @@ private struct MetricCard: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
         .background(RoundedRectangle(cornerRadius: 16, style: .continuous)
-            .fill(Color(nsColor: .controlBackgroundColor)))
+            .fill(CustodTheme.surface))
         .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous)
             .strokeBorder(Color.primary.opacity(0.06), lineWidth: 1))
     }
@@ -149,7 +126,7 @@ struct ContentView: View {
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(Color(nsColor: .windowBackgroundColor))
+                .background(CustodTheme.cream)
             }
             .navigationTitle("Custod")
 
@@ -171,9 +148,12 @@ private struct SidebarView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             HStack(spacing: 10) {
-                Image(systemName: "shield.lefthalf.filled")
-                    .font(.system(size: 22, weight: .bold)).foregroundStyle(Color.brand)
+                Circle()
+                    .fill(monitor.analysis.map { statusColor($0.status) } ?? CustodTheme.statusGreen)
+                    .frame(width: 10, height: 10)
+                    .shadow(color: (monitor.analysis.map { statusColor($0.status) } ?? CustodTheme.statusGreen).opacity(0.5), radius: 4)
                 Text("Custod").font(.system(size: 24, weight: .heavy, design: .rounded))
+                    .foregroundStyle(CustodTheme.brown)
             }
             .padding(.top, 6)
 
@@ -232,7 +212,7 @@ private struct SidebarView: View {
         }
         .padding(14)
         .background(RoundedRectangle(cornerRadius: 16, style: .continuous)
-            .fill(Color(nsColor: .controlBackgroundColor)))
+            .fill(CustodTheme.surface))
         .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous)
             .strokeBorder(monitor.isActive ? Color.brand.opacity(0.35) : Color.primary.opacity(0.06), lineWidth: 1))
     }
@@ -557,7 +537,7 @@ private struct HistoryView: View {
                     }
                     .padding(14)
                     .background(RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .fill(Color(nsColor: .controlBackgroundColor)))
+                        .fill(CustodTheme.surface))
                     .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous)
                         .strokeBorder(Color.primary.opacity(0.06), lineWidth: 1))
                     .contextMenu { Button("Delete", role: .destructive) { history.delete(record) } }
@@ -757,7 +737,11 @@ private struct BreakOverlay: View {
 
     var body: some View {
         ZStack {
-            Rectangle().fill(.ultraThinMaterial).ignoresSafeArea()
+            LinearGradient(
+                colors: [CustodTheme.cream, CustodTheme.rose.opacity(0.25)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            ).ignoresSafeArea()
             VStack(spacing: 16) {
                 Image(systemName: "wind").font(.system(size: 40)).foregroundStyle(Color.brand)
                 Text("Time to reset").font(.system(.largeTitle, design: .rounded).weight(.bold))
@@ -799,10 +783,10 @@ private struct BreakOverlay: View {
             .padding(40)
             .frame(maxWidth: 460)
             .background(RoundedRectangle(cornerRadius: 28, style: .continuous)
-                .fill(Color(nsColor: .windowBackgroundColor)))
+                .fill(CustodTheme.surface))
             .overlay(RoundedRectangle(cornerRadius: 28, style: .continuous)
-                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1))
-            .shadow(color: .black.opacity(0.2), radius: 30, y: 10)
+                .strokeBorder(CustodTheme.taupe.opacity(0.6), lineWidth: 1))
+            .shadow(color: CustodTheme.brown.opacity(0.12), radius: 30, y: 10)
         }
         .onAppear { tickRemaining() }
         .onReceive(timer) { _ in tickRemaining() }

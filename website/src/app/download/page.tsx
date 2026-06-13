@@ -1,5 +1,6 @@
 import { Apple, ArrowLeft, Puzzle } from "lucide-react";
 import Link from "next/link";
+import { CustodButton, CustodCard, CustodTag } from "@/components/custod/ui";
 import { LINKS } from "@/lib/custod-links";
 
 export const metadata = {
@@ -8,80 +9,90 @@ export const metadata = {
 
 export default function DownloadPage() {
   return (
-    <main className="relative min-h-screen px-5 py-12 md:px-8">
+    <main className="relative min-h-screen bg-background px-5 py-12 md:px-8">
       <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-64 custod-hero-gradient" />
 
       <Link
         href="/"
-        className="inline-flex items-center gap-1.5 text-sm font-medium text-white/90 transition hover:text-white"
+        className="inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground transition hover:text-foreground"
       >
         <ArrowLeft className="size-4" />
         Back
       </Link>
 
       <div className="mx-auto max-w-3xl">
-        <div className="mt-8 text-center text-white">
-          <h1 className="font-heading text-4xl tracking-tight md:text-5xl">Get Custod</h1>
-          <p className="mx-auto mt-3 max-w-xl text-white/85">
+        <div className="mt-8 text-center">
+          <h1 className="font-heading text-4xl tracking-tight text-foreground md:text-5xl">
+            Get Custod
+          </h1>
+          <div className="mx-auto mt-4 flex justify-center">
+            <span className="custod-accent-bar" />
+          </div>
+          <p className="mx-auto mt-4 max-w-xl text-muted-foreground">
             Run a check in seconds. Free, private, and it never reads your page contents.
           </p>
         </div>
 
         <div className="mt-10 grid gap-5 md:grid-cols-2">
-          {/* Chrome */}
-          <div id="chrome" className="scroll-mt-24 rounded-3xl border border-[#e2e8f0] bg-white p-6 shadow-xl">
-            <span className="grid size-12 place-items-center rounded-2xl bg-custod-primary/10 text-custod-primary">
+          <CustodCard id="chrome" className="scroll-mt-24 p-6">
+            <span className="grid size-12 place-items-center rounded-2xl bg-primary/10 text-primary">
               <Puzzle className="size-6" />
             </span>
             <h2 className="mt-4 text-xl font-semibold">Chrome extension</h2>
-            <span className="mt-1 inline-block rounded-full bg-custod-primary/10 px-2 py-0.5 text-xs font-medium text-custod-primary">
-              Beta
-            </span>
-            <p className="mt-3 text-sm leading-relaxed text-[#475569]">
+            <CustodTag className="mt-2">Beta</CustodTag>
+            <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
               The fastest way to use Custod. One click captures your current window&apos;s tabs and
               shows a status with a reset. Works in Chrome, Edge, Brave, and Arc.
             </p>
-            <ol className="mt-4 space-y-2 text-sm text-[#475569]">
-              <li>1. Download the extension from the repo.</li>
-              <li>2. Open <span className="font-mono text-xs">chrome://extensions</span> and turn on Developer mode.</li>
-              <li>3. Click &quot;Load unpacked&quot; and select the <span className="font-mono text-xs">extension/dist</span> folder.</li>
+            <ol className="mt-4 space-y-2 text-sm text-muted-foreground">
+              <li>1. Clone the Custod repo from GitHub.</li>
+              <li>
+                2. Build:{" "}
+                <span className="font-mono text-xs">
+                  cd website/extension && npm install && npm run build
+                </span>
+              </li>
+              <li>
+                3. Open <span className="font-mono text-xs">chrome://extensions</span> and turn on
+                Developer mode.
+              </li>
+              <li>
+                4. Click &quot;Load unpacked&quot; and select{" "}
+                <span className="font-mono text-xs">website/extension/dist</span>.
+              </li>
             </ol>
-            <Link
-              href={LINKS.github}
-              className="custod-primary-button mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-medium text-white"
-            >
+            <CustodButton href={LINKS.github} className="mt-5 w-full">
               <Puzzle className="size-4" /> Get the extension
-            </Link>
-          </div>
+            </CustodButton>
+          </CustodCard>
 
-          {/* Mac */}
-          <div id="mac" className="scroll-mt-24 rounded-3xl border border-[#e2e8f0] bg-white p-6 shadow-xl">
-            <span className="grid size-12 place-items-center rounded-2xl bg-[#0f172a]/5 text-[#0f172a]">
+          <CustodCard id="mac" className="scroll-mt-24 p-6">
+            <span className="grid size-12 place-items-center rounded-2xl bg-secondary text-foreground">
               <Apple className="size-6" />
             </span>
             <h2 className="mt-4 text-xl font-semibold">macOS app</h2>
-            <span className="mt-1 inline-block rounded-full bg-[#f6f8f7] px-2 py-0.5 text-xs font-medium text-custod-muted">
-              Coming soon
-            </span>
-            <p className="mt-3 text-sm leading-relaxed text-[#475569]">
+            <CustodTag className="mt-2">Beta</CustodTag>
+            <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
               A menu-bar pressure sensor that runs local, browser-agnostic checks and keeps a
               private baseline of your usual pattern — no page contents, ever.
             </p>
-            <button
-              disabled
-              className="mt-5 inline-flex w-full cursor-not-allowed items-center justify-center gap-2 rounded-xl border border-[#e2e8f0] bg-[#f6f8f7] px-4 py-3 text-sm font-medium text-custod-muted"
-            >
-              <Apple className="size-4" /> Get for Mac (soon)
-            </button>
-            <p className="mt-3 text-center text-xs text-custod-muted">
-              Use the web dashboard or Chrome extension in the meantime.
+            <ol className="mt-4 space-y-2 text-sm text-muted-foreground">
+              <li>1. Open <span className="font-mono text-xs">macos/Custod/Custodt.xcodeproj</span> in Xcode.</li>
+              <li>2. Select the Custodt scheme and target &quot;My Mac&quot;.</li>
+              <li>3. Press ⌘R to build and run.</li>
+            </ol>
+            <CustodButton href={LINKS.github} variant="secondary" className="mt-5 w-full">
+              <Apple className="size-4" /> Build from source
+            </CustodButton>
+            <p className="mt-3 text-center text-xs text-muted-foreground">
+              Or use the web dashboard or Chrome extension in the meantime.
             </p>
-          </div>
+          </CustodCard>
         </div>
 
-        <p className="mt-8 text-center text-sm text-white/80">
+        <p className="mt-8 text-center text-sm text-muted-foreground">
           Prefer the web?{" "}
-          <Link href={LINKS.dashboard} className="font-medium underline">
+          <Link href={LINKS.dashboard} className="font-medium text-primary hover:underline">
             Open the dashboard
           </Link>
         </p>
