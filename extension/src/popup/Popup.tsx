@@ -53,9 +53,12 @@ export function Popup() {
   return (
     <main className="popup">
       <header>
-        <div>
-          <h1>Custod</h1>
-          <p>Browser burnout warning light</p>
+        <div className="brand">
+          <img src="/logo.png" alt="Custod logo" className="logo" width={32} height={32} />
+          <div>
+            <h1>Custod</h1>
+            <p>Browser burnout warning light</p>
+          </div>
         </div>
         <div className="count">{tabCount}</div>
       </header>

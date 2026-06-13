@@ -3,7 +3,7 @@
 > Coordination file between Claude Code (architecture/product/backend design) and Codex (precise
 > implementation, terminal work, build/deploy, adversarial review). Keep this current.
 
-_Last updated: 2026-06-13 by Claude Code (planning phase)._
+_Last updated: 2026-06-13 by Codex (backend implementation pass)._
 
 ---
 
@@ -30,6 +30,22 @@ Additive only. No existing code modified, no teammate work overwritten.
 - `supabase/schema.sql` — created (full schema + indexes + FKs + RLS + retention notes).
 - `docs/custod-research-and-product-strategy.md` — left intact (not authored by this pass).
 
+## Files changed in this pass (Codex)
+
+- `lib/types.ts` — extended with additive `scans` contract types while preserving legacy `checks` types.
+- `lib/scoring/index.ts` — added deterministic six-category scan analyzer.
+- `lib/ai/index.ts` — added optional OpenAI/Gemini wording wrapper with safe rules fallback.
+- `lib/privacy/index.ts` — added sanitization, domain extraction, share-safe summaries, and Markdown export helpers.
+- `lib/gamification/index.ts` — added progress/streak/achievement derivation from real events.
+- `lib/validation/schemas.ts` — added Zod request validation for new routes.
+- `lib/storage/scans.ts` — added Supabase/in-memory storage abstraction for devices, scans, events, privacy, share, export, delete.
+- `lib/storage.ts` — kept legacy `checks` API working with in-memory fallback when Supabase env is missing.
+- `lib/supabase.ts` — added `hasSupabaseAdminEnv()` and `getSupabaseAdminIfConfigured()` without reverting server-key cleanup.
+- `app/api/devices/register`, `app/api/scans*`, `app/api/trends`, `app/api/me/*`, `app/api/share`, `app/api/export` — added MVP backend routes.
+- `app/api/share/[slug]/route.ts` — resolves new scan shares first, then falls back to legacy check shares.
+- `supabase/schema.sql` — aligned schema with persisted analysis/tab groups, reflection metadata, and device-scoped shares.
+- `README.md`, `docs/API_CONTRACTS.md`, `docs/ARCHITECTURE.md`, `docs/AGENT_HANDOFF.md` — updated for implemented backend behavior.
+
 ## What Claude handled
 
 - Reviewed repo, pulled/fetched latest, confirmed `develop` is current.
@@ -46,15 +62,13 @@ Additive only. No existing code modified, no teammate work overwritten.
    - `.env.local` with Supabase keys is committed to the repo (see Known Risks). Decide with the team: rotate keys, remove from git history, and switch server code to a **service-role key server-side only** + RLS, with the publishable key only for guarded client reads.
    - Update `README.md` storage section (it falsely claims local-JSON storage).
 2. **Apply `supabase/schema.sql`** to the Supabase project (`vdzugcxkqzfauaywiria`). Verify tables + RLS. Add a `migrations/` baseline once stable.
-3. **Land the `scans` contract additively** (see API_CONTRACTS.md + ARCHITECTURE.md §11):
-   - Extend `lib/types.ts` with the target types (`Scan`, `Device`, `RiskBreakdown`, `TabGroup`, `ResetPlan`, `Reflection`, `Streak`, `Achievement`, `NudgePreferences`, `PrivacySettings`, `AnalyzeBurnoutRequest/Response`). Do **not** delete existing types the UI still imports.
-   - Build `lib/scoring/` as the pure 6-category engine; adapt or wrap existing `lib/analyzer.ts` logic. Keep it deterministic and tested.
-   - Add `/api/scans*`, `/api/devices/register`, `/api/trends`, `/api/me/progress`, `/api/me/privacy`, `/api/share`, `/api/export`, `/api/me/data` per contract. Keep `/api/analyze` + `/api/checks*` as thin aliases.
-   - Add Zod validation (`lib/validation/`) for every request body.
-4. **Privacy plumbing:** aggregate-vs-raw split in `lib/privacy/`, `privacy_settings` honored on ingest, retention cleanup (Supabase cron/edge fn using the SQL at the bottom of schema.sql).
-5. **Gamification:** `lib/gamification/` deriving streaks/achievements from `scan_events`. No shame/childish mechanics.
-6. **Optional AI wrapper:** `lib/ai/` (OpenAI → Gemini → rules fallback) with strict-JSON validation and the safety constraints in PRIVACY_SAFETY.md. Only if keys exist; rules-only must stay fully functional.
-7. **Verify:** `npm run typecheck`, `npm run lint`, `npm run build`; extension build if touched. Report results.
+3. **Finish UI migration from `checks` to `scans` when product owner is ready.**
+   - Current dashboard still uses `/api/analyze` + `/api/checks*`.
+   - New clients should use `/api/scans*`.
+4. **Privacy hardening:** implement encrypted `scan_private_payloads` before enabling `storeRawTabs`; current implementation stores aggregate/full analysis JSON for server retrieval and share-safe public output defaults to hiding raw tabs.
+5. **Retention cleanup:** wire Supabase cron/edge function for expired private payloads and shares.
+6. **DB verification:** apply `supabase/schema.sql` to Supabase and verify table/RLS behavior.
+7. **Generated DB types:** replace the local loose Supabase query-builder type in `lib/storage/scans.ts` once schema-generated TypeScript types exist.
 
 ## What Codex should NOT touch
 
@@ -110,3 +124,13 @@ cd extension && VITE_WEB_APP_URL=http://localhost:3000 npm run build
 # apply DB schema (Supabase SQL editor or CLI)
 # psql "$SUPABASE_DB_URL" -f supabase/schema.sql
 ```
+
+## Commands run by Codex
+
+```bash
+git fetch origin
+npm install zod
+npm run typecheck
+```
+
+Current verification status: `npm run typecheck` passes. Lint, build, and route smoke tests are the next verification steps.

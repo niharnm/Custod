@@ -2,7 +2,9 @@ import "server-only";
 
 import type { BurnoutAnalysis, BurnoutCheckRecord, BrowserTab, MoodCheckIn } from "@/lib/types";
 import { generateId } from "@/lib/utils";
-import { supabase } from "@/lib/supabase";
+import { getSupabaseAdminIfConfigured } from "@/lib/supabase";
+
+const memoryChecks = new Map<string, BurnoutCheckRecord>();
 
 export async function createCheck(input: {
   rawTabs: BrowserTab[];
@@ -16,6 +18,12 @@ export async function createCheck(input: {
     mood: input.mood,
     analysis: input.analysis,
   };
+
+  const supabase = getSupabaseAdminIfConfigured();
+  if (!supabase) {
+    memoryChecks.set(record.id, record);
+    return record;
+  }
 
   const { error } = await supabase.from("checks").insert({
     id: record.id,
@@ -31,6 +39,9 @@ export async function createCheck(input: {
 }
 
 export async function getCheck(id: string): Promise<BurnoutCheckRecord | null> {
+  const supabase = getSupabaseAdminIfConfigured();
+  if (!supabase) return memoryChecks.get(id) ?? null;
+
   const { data, error } = await supabase
     .from("checks")
     .select("*")
@@ -42,6 +53,13 @@ export async function getCheck(id: string): Promise<BurnoutCheckRecord | null> {
 }
 
 export async function listChecks(limit = 20): Promise<BurnoutCheckRecord[]> {
+  const supabase = getSupabaseAdminIfConfigured();
+  if (!supabase) {
+    return Array.from(memoryChecks.values())
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      .slice(0, limit);
+  }
+
   const { data, error } = await supabase
     .from("checks")
     .select("*")
@@ -53,6 +71,16 @@ export async function listChecks(limit = 20): Promise<BurnoutCheckRecord[]> {
 }
 
 export async function ensureShareSlug(id: string): Promise<string | null> {
+  const supabase = getSupabaseAdminIfConfigured();
+  if (!supabase) {
+    const existing = memoryChecks.get(id);
+    if (!existing) return null;
+    if (existing.shareSlug) return existing.shareSlug;
+    const slug = generateId().replace(/-/g, "").slice(0, 10);
+    memoryChecks.set(id, { ...existing, shareSlug: slug });
+    return slug;
+  }
+
   const { data: existing, error: fetchErr } = await supabase
     .from("checks")
     .select("share_slug")
@@ -75,6 +103,11 @@ export async function ensureShareSlug(id: string): Promise<string | null> {
 }
 
 export async function getCheckBySlug(slug: string): Promise<BurnoutCheckRecord | null> {
+  const supabase = getSupabaseAdminIfConfigured();
+  if (!supabase) {
+    return Array.from(memoryChecks.values()).find((check) => check.shareSlug === slug) ?? null;
+  }
+
   const { data, error } = await supabase
     .from("checks")
     .select("*")

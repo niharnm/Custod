@@ -79,12 +79,25 @@ Keep `extension/manifest.json` host permissions aligned with the deployed app do
 
 ## Storage
 
-The current MVP uses local JSON fallback storage:
+The backend uses a storage abstraction:
 
-- local dev: `.custod-data/checks.json`
-- Vercel/serverless fallback: `/tmp/custod-checks.json`
+- Supabase when `SUPABASE_SERVICE_ROLE_KEY` (or `SUPABASE_SECRET_KEY`) and `NEXT_PUBLIC_SUPABASE_URL`/`SUPABASE_URL` exist.
+- In-memory local/dev fallback when Supabase server env vars are missing.
 
-That is good enough for a hackathon prototype and local testing, but it is not durable hosted storage. Add Supabase/Postgres or another explicit persistence layer before depending on long-term hosted history.
+The fallback is deliberately nonpersistent and is only for local development or CI smoke tests. Hosted deployments should use Supabase with `supabase/schema.sql` applied. Do not use browser clients or extensions to write directly to Supabase tables.
+
+Expected env vars:
+
+```bash
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+NEXT_PUBLIC_SUPABASE_URL=https://your-project-id.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=sb_publishable_...
+SUPABASE_SERVICE_ROLE_KEY=sb_secret_...
+OPENAI_API_KEY=
+GEMINI_API_KEY=
+```
+
+AI keys are optional. If neither key exists, Custod still returns a full deterministic analysis.
 
 ## Deploy To Vercel
 
@@ -98,13 +111,27 @@ NEXT_PUBLIC_APP_URL=https://your-custod-deploy.vercel.app
 
 | Method | Route | Purpose |
 | --- | --- | --- |
+| `POST` | `/api/devices/register` | Register or refresh an anonymous device. |
+| `POST` | `/api/scans` | Analyze submitted tabs, store the scan, and return the full check-engine result. |
+| `GET` | `/api/scans` | Return recent scan history for a device. |
+| `GET` | `/api/scans/[id]` | Return one scan. Add `?format=md` for Markdown export. |
+| `POST` | `/api/scans/[id]/reflection` | Store an optional reflection on a scan. |
+| `POST` | `/api/scans/[id]/reset-complete` | Record reset completion and return progress updates. |
+| `GET` | `/api/trends` | Return aggregate score trends and common patterns. |
+| `GET` | `/api/me/progress` | Return streaks, achievements, weekly consistency, and stability trend. |
+| `GET`/`PATCH` | `/api/me/privacy` | Read or update device privacy settings. |
+| `POST` | `/api/share` | Create an expiring public scan summary link. |
+| `GET` | `/api/share/[slug]` | Return a public shared scan summary, or a legacy shared check. |
+| `GET` | `/api/export` | Export device data as JSON or Markdown. |
+| `DELETE` | `/api/me/data` | Delete device-owned scan data with `{ "confirm": true }`. |
 | `POST` | `/api/analyze` | Analyze submitted tabs and create a burnout check. |
 | `GET` | `/api/checks` | Return recent checks for history/trend. |
 | `GET` | `/api/checks/[id]` | Return a check. Add `?format=md` for Markdown export. |
 | `POST` | `/api/checks/[id]/share` | Create or return a public share link. |
-| `GET` | `/api/share/[slug]` | Return a shared read-only check. |
 
-`POST /api/analyze` body:
+The `checks` routes are legacy aliases kept for the current dashboard. New clients should use `scans`.
+
+`POST /api/scans` body:
 
 ```ts
 type BrowserTab = {
@@ -115,13 +142,16 @@ type BrowserTab = {
   favIconUrl?: string;
 };
 
-type MoodCheckIn = {
-  energy?: number; // 1-5
-  stress?: number; // 1-5
-  timePressure?: "none" | "some" | "high";
-  reflection?: string;
+type AnalyzeBurnoutRequest = {
+  tabs: BrowserTab[];
+  goal?: string;
+  moodCheckIn?: "calm" | "stressed" | "overwhelmed" | "numb" | "skip";
+  timeRemaining?: string;
+  deviceId?: string;
 };
 ```
+
+Clients may also send `X-Custod-Device` instead of `deviceId`.
 
 ## Safety Notes
 

@@ -3,6 +3,11 @@
   "name": "Custod",
   "version": "0.1.0",
   "description": "Detect early burnout patterns from browser behavior.",
+  "icons": {
+    "16": "icons/icon-16.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
   "permissions": ["tabs", "storage"],
   "host_permissions": ["http://localhost:3000/*", "https://*.vercel.app/*", "https://custod.app/*"],
   "background": {
@@ -17,6 +22,11 @@
   ],
   "action": {
     "default_title": "Custod",
-    "default_popup": "index.html"
+    "default_popup": "index.html",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "48": "icons/icon-48.png",
+      "128": "icons/icon-128.png"
+    }
   }
 }

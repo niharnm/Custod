@@ -147,6 +147,15 @@ This avoids breaking the working dashboard mid-flight. Codex owns the mechanical
 The web app currently lives at the **repo root** (not `web/`). Keep it there to avoid breaking Vercel auto-detection and teammate branches. Proposed additive structure:
 
 ```
+
+Implemented MVP backend modules now live in:
+
+- `lib/scoring/index.ts` — pure deterministic six-category scoring.
+- `lib/ai/index.ts` — optional OpenAI/Gemini wording wrapper with rules fallback.
+- `lib/privacy/index.ts` — URL/domain sanitization, share-safe scans, export formatting.
+- `lib/storage/scans.ts` — Supabase-backed store with nonpersistent in-memory local/dev fallback.
+- `lib/gamification/index.ts` — streak, achievement, weekly consistency, and stability derivation.
+- `lib/validation/schemas.ts` — Zod schemas for the new route bodies.
 app/
   api/
     devices/register/route.ts

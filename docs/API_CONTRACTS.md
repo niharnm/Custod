@@ -4,6 +4,10 @@
 > **Freeze this before splitting UI/backend work.** Status terms use `scans` (target); current code still
 > exposes `checks` — see [ARCHITECTURE.md §11](./ARCHITECTURE.md) migration plan.
 
+Implementation status as of 2026-06-13: the `scans` API surface is implemented additively in
+`app/api/scans*`, `app/api/devices/register`, `app/api/trends`, `app/api/me/*`, `app/api/share`,
+and `app/api/export`. Existing `checks` routes remain for dashboard compatibility.
+
 ## Conventions
 
 - All routes are Next.js App Router handlers under `app/api/`.
@@ -156,6 +160,7 @@ type AnalyzeBurnoutResponse = {
 - **Auth/device:** `deviceId` (body or `X-Custod-Device`). Anonymous allowed in MVP.
 - **Privacy:** server sanitizes tabs (drops anything resembling page content); raw tabs/URLs persisted **only** if `privacySettings.storeRawTabs` — else only aggregate fields + evidence counts are stored. AI (if enabled) receives only safe fields.
 - **MVP:** deterministic scoring; persist scan + risk_scores + reset_plan; store raw payload only when opted in.
+- **Current implementation:** deterministic scoring always works without AI keys; Supabase is used when server env vars exist, otherwise a nonpersistent in-memory local/dev store is used.
 - **Future:** idempotent dedupe, AI wording, encrypted raw payload with `expires_at`, rate limiting.
 
 ### `GET /api/scans/[id]`
