@@ -511,8 +511,11 @@ function riskRow(scanId: string, risk: Scan["riskBreakdown"]) {
   };
 }
 
+// Dynamic rows returned by the Supabase query shim; values are validated/coerced at each rowTo* boundary.
+/* eslint-disable @typescript-eslint/no-explicit-any */
 type DbRow = Record<string, any>;
 type QueryResult = { data: any; error: { message: string } | null };
+/* eslint-enable @typescript-eslint/no-explicit-any */
 
 async function query(value: DbBuilder): Promise<QueryResult> {
   return value;
