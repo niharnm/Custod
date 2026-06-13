@@ -328,7 +328,20 @@ function loadStats(state) {
     switches.textContent = String(rate);
   }
   if (session) {
-    const mins = state && typeof state.sessionMinutes === "number" ? state.sessionMinutes : 0;
-    session.textContent = String(mins);
+    // Real active-browsing time today, not how long the browser's been open.
+    // Fall back to the legacy session figure if an older background is loaded.
+    const mins =
+      state && typeof state.activeMinutesToday === "number"
+        ? state.activeMinutesToday
+        : state && typeof state.sessionMinutes === "number"
+        ? state.sessionMinutes
+        : 0;
+    session.textContent = formatMinutes(mins);
   }
+}
+
+function formatMinutes(mins) {
+  if (!mins || mins < 1) return "0m";
+  if (mins < 60) return `${mins}m`;
+  return `${Math.floor(mins / 60)}h ${mins % 60}m`;
 }

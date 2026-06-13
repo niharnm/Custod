@@ -62,6 +62,29 @@ let sessionStart = Date.now();
 let lastDistractionMs = null;
 let frustrationCount = 0;
 
+// --- Real active-browsing time (the "screen time" number) -------------------
+// The old "session minutes" just measured how long the browser had been open,
+// which is wrong — it kept climbing even while you were in another app, idle,
+// or away from the keyboard. Instead we accumulate the time you're *actually*
+// using the browser: a Chrome window is focused AND you're not system-idle.
+// The running total is kept per local day and persisted, so it survives the
+// MV3 service worker being torn down and respawned (which happens constantly).
+const ACTIVE_IDLE_SECONDS = 60;          // idle longer than this => not active
+const ACTIVE_MAX_GAP_MS = 90 * 1000;     // cap a single accounting gap (sleep/SW death)
+let activeDayKey = "";
+let activeMsToday = 0;
+let lastAccountedAt = 0;
+let browserFocused = true;
+
+function localDayKey(now = Date.now()) {
+  const d = new Date(now);
+  return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+}
+
+function activeMinutesToday() {
+  return Math.max(0, Math.round(activeMsToday / 60000));
+}
+
 let currentSessionId = null;
 let sessionStartedAt = null;
 let lastVisitUrl = null;
@@ -75,7 +98,10 @@ let lastVisitAt = 0;
       "frustrationCount",
       "tabSwitchEvents",
       "currentSessionId",
-      "sessionStartedAt"
+      "sessionStartedAt",
+      "activeDayKey",
+      "activeMsToday",
+      "lastAccountedAt"
     ]);
     if (typeof stored.sessionStart === "number") sessionStart = stored.sessionStart;
     if (typeof stored.lastDistractionMs === "number") lastDistractionMs = stored.lastDistractionMs;
@@ -83,6 +109,9 @@ let lastVisitAt = 0;
     if (Array.isArray(stored.tabSwitchEvents)) tabSwitchEvents = stored.tabSwitchEvents;
     if (typeof stored.currentSessionId === "string") currentSessionId = stored.currentSessionId;
     if (typeof stored.sessionStartedAt === "number") sessionStartedAt = stored.sessionStartedAt;
+    if (typeof stored.activeDayKey === "string") activeDayKey = stored.activeDayKey;
+    if (typeof stored.activeMsToday === "number") activeMsToday = stored.activeMsToday;
+    if (typeof stored.lastAccountedAt === "number") lastAccountedAt = stored.lastAccountedAt;
   } catch (e) {
     console.warn("[BurnoutCheck] rehydrate failed:", e && e.message);
   }
@@ -99,6 +128,12 @@ let lastVisitAt = 0;
       if (activeTab.title) lastTitleByTab[activeTab.id] = activeTab.title;
     }
   } catch (_) {}
+
+  // Establish current focus and a fresh accounting anchor so the respawned
+  // worker doesn't credit (or lose) the time it was asleep.
+  browserFocused = await isBrowserFocused();
+  lastAccountedAt = Date.now();
+  await accountActiveTime();
 })();
 
 async function persistVolatile() {
@@ -109,7 +144,10 @@ async function persistVolatile() {
       frustrationCount,
       tabSwitchEvents,
       currentSessionId,
-      sessionStartedAt
+      sessionStartedAt,
+      activeDayKey,
+      activeMsToday,
+      lastAccountedAt
     });
   } catch (e) {
     /* storage best-effort */
@@ -178,6 +216,7 @@ function registerAlarms() {
   chrome.alarms.create("collectAndScore", { periodInMinutes: 5 });
   chrome.alarms.create("pruneState", { periodInMinutes: 1 });
   chrome.alarms.create("sessionCheck", { periodInMinutes: 1 });
+  chrome.alarms.create("activityTick", { periodInMinutes: 1 });
 }
 
 chrome.runtime.onInstalled.addListener(() => {
@@ -243,6 +282,8 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === "collectAndScore") {
     collectAndScore();
+  } else if (alarm.name === "activityTick") {
+    accountActiveTime();
   } else if (alarm.name === "pruneState") {
     pruneState();
   } else if (alarm.name === "sessionCheck") {
@@ -258,6 +299,74 @@ function pruneState() {
   const cutoff = Date.now() - 10 * 60 * 1000;
   tabSwitchEvents = tabSwitchEvents.filter((ts) => ts >= cutoff);
   persistVolatile();
+}
+
+// ---------------------------------------------------------------------------
+// Active-browsing time accounting (real "screen time")
+// ---------------------------------------------------------------------------
+
+// Whether a Chrome window currently holds OS focus. Updated by the focus
+// listener, but we also re-check on demand so a torn-down service worker that
+// just respawned doesn't trust a stale value.
+async function isBrowserFocused() {
+  try {
+    const win = await chrome.windows.getLastFocused();
+    return !!(win && win.focused);
+  } catch (_) {
+    return false;
+  }
+}
+
+// Credit the elapsed time to "today" when the user was actually browsing:
+// a Chrome window focused AND the system not idle/locked. Called on a 1-minute
+// alarm and whenever focus/idle state changes.
+async function accountActiveTime() {
+  const now = Date.now();
+  const key = localDayKey(now);
+
+  if (key !== activeDayKey) {
+    // New day (or first run): start a fresh total, don't backfill the gap.
+    activeDayKey = key;
+    activeMsToday = 0;
+    lastAccountedAt = now;
+    await persistVolatile();
+    return;
+  }
+
+  let idleState = "active";
+  try {
+    idleState = await chrome.idle.queryState(ACTIVE_IDLE_SECONDS);
+  } catch (_) {
+    /* permission missing or unavailable — assume active */
+  }
+  const focused = browserFocused && (await isBrowserFocused());
+  const active = focused && idleState === "active";
+
+  const elapsed = lastAccountedAt ? Math.min(now - lastAccountedAt, ACTIVE_MAX_GAP_MS) : 0;
+  if (active && elapsed > 0) {
+    activeMsToday += elapsed;
+  }
+  lastAccountedAt = now;
+  await persistVolatile();
+}
+
+chrome.windows.onFocusChanged.addListener((windowId) => {
+  // Close the books on the prior interval before changing focus state, so the
+  // time up to this moment is credited under the old (correct) condition.
+  accountActiveTime().finally(() => {
+    browserFocused = windowId !== chrome.windows.WINDOW_ID_NONE;
+    lastAccountedAt = Date.now();
+    persistVolatile();
+  });
+});
+
+try {
+  chrome.idle.setDetectionInterval(ACTIVE_IDLE_SECONDS);
+  chrome.idle.onStateChanged.addListener(() => {
+    accountActiveTime();
+  });
+} catch (_) {
+  /* idle API unavailable */
 }
 
 // ---------------------------------------------------------------------------
@@ -645,17 +754,22 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
   if (msg.type === "get_state") {
     const now = Date.now();
-    chrome.storage.local
-      .get([
-        "lastScore",
-        "lastStatus",
-        "lastTriggers",
-        "lastIntervention",
-        "lastUpdated",
-        "scoreHistory",
-        "lastSwitchRatePerMin",
-        "lastSessionMinutes"
-      ])
+    // Refresh active-time before reading so the popup shows an up-to-the-second
+    // figure, then bundle it into the response.
+    accountActiveTime()
+      .catch(() => {})
+      .then(() =>
+        chrome.storage.local.get([
+          "lastScore",
+          "lastStatus",
+          "lastTriggers",
+          "lastIntervention",
+          "lastUpdated",
+          "scoreHistory",
+          "lastSwitchRatePerMin",
+          "lastSessionMinutes"
+        ])
+      )
       .then((data) => {
         sendResponse({
           lastScore: data.lastScore ?? 0,
@@ -666,6 +780,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           scoreHistory: data.scoreHistory ?? [],
           switchRatePerMin: computeSwitchRatePerMin(now),
           sessionMinutes: computeSessionMinutes(now),
+          activeMinutesToday: activeMinutesToday(),
           switchesLast5Min: tabSwitchEvents.filter((ts) => ts >= now - 5 * 60 * 1000).length
         });
       });
