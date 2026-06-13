@@ -2,11 +2,19 @@ import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 import { getScanStore } from "@/lib/storage/scans";
 import { shareRequestSchema, zodErrorMessage } from "@/lib/validation/schemas";
+import { clientKey, rateLimit } from "@/lib/http-guards";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
   try {
+    const limited = rateLimit(clientKey(request, "share"), 20, 60_000);
+    if (!limited.ok) {
+      return NextResponse.json(
+        { error: "Too many share links created. Please wait a moment." },
+        { status: 429, headers: { "Retry-After": String(limited.retryAfter) } }
+      );
+    }
     const deviceId = request.headers.get("X-Custod-Device") ?? undefined;
     const parsed = shareRequestSchema.parse(await request.json().catch(() => ({})));
     const share = await getScanStore().createShare(parsed.scanId, parsed, deviceId);

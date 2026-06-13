@@ -45,7 +45,7 @@ const RECOVERY_WORDS = ["breathing", "meditation", "walk", "timer", "music", "sl
 export function analyzeWithRules(input: AnalyzeBurnoutRequest): AnalyzeBurnoutResponse {
   const tabs = sanitizeTabsForAnalysis(input.tabs);
   const createdAt = new Date().toISOString();
-  const classified = tabs.map((tab) => ({ tab, category: categorizeTab(tab, input.goal) }));
+  const classified = tabs.map((tab) => ({ tab, category: categorizeTab(tab) }));
   const riskBreakdown = scoreRisks(classified, input);
   const score = overallScore(riskBreakdown, input.moodCheckIn, tabs.length);
   const status = statusFromScore(score);
@@ -146,11 +146,16 @@ function overallScore(risk: RiskBreakdown, mood: MoodCheckInValue | undefined, t
   return score;
 }
 
-function categorizeTab(tab: BrowserTab, goal?: string): TabCategory {
-  const text = `${tab.title} ${tab.url} ${goal ?? ""}`.toLowerCase();
+function categorizeTab(tab: BrowserTab): TabCategory {
+  // Classify each tab from its OWN title/url only. The user's goal is handled
+  // separately as time-pressure — folding it in here would mis-tag every tab
+  // (e.g. a "deadline" goal would re-label YouTube as a deadline tab).
+  const text = `${tab.title} ${tab.url}`.toLowerCase();
   const domain = extractDomain(tab.url);
-  if (containsAny(text, DEADLINE_WORDS)) return "deadline";
+  // Domain-based distraction wins first: a youtube.com tab is a distraction
+  // regardless of words in its title.
   if (DISTRACTION_DOMAINS.some((item) => domain.includes(item))) return "distraction";
+  if (containsAny(text, DEADLINE_WORDS)) return "deadline";
   if (containsAny(text, COMMUNICATION_WORDS)) return "communication";
   if (containsAny(text, CODING_WORDS)) return "coding";
   if (containsAny(text, SCHOOL_WORDS)) return "school";

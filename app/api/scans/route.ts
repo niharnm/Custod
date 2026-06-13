@@ -4,11 +4,27 @@ import { applyOptionalAiWording } from "@/lib/ai";
 import { analyzeWithRules } from "@/lib/scoring";
 import { getScanStore } from "@/lib/storage/scans";
 import { analyzeBurnoutRequestSchema, zodErrorMessage } from "@/lib/validation/schemas";
+import { clientKey, getIdempotent, rateLimit, setIdempotent } from "@/lib/http-guards";
+import type { AnalyzeBurnoutResponse } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
   try {
+    const limited = rateLimit(clientKey(request, "scans"), 30, 60_000);
+    if (!limited.ok) {
+      return NextResponse.json(
+        { error: "Too many checks in a short time. Take a breath and try again shortly." },
+        { status: 429, headers: { "Retry-After": String(limited.retryAfter) } }
+      );
+    }
+
+    const idempotencyKey = request.headers.get("Idempotency-Key");
+    if (idempotencyKey) {
+      const cached = getIdempotent<AnalyzeBurnoutResponse>(`scans:${idempotencyKey}`);
+      if (cached) return NextResponse.json(cached);
+    }
+
     const body = await request.json().catch(() => ({}));
     const parsed = analyzeBurnoutRequestSchema.parse({
       ...body,
@@ -22,6 +38,8 @@ export async function POST(request: Request) {
     const rules = analyzeWithRules(parsed);
     const analysis = await applyOptionalAiWording(parsed, rules);
     await getScanStore().createScan(analysis, parsed.deviceId);
+
+    if (idempotencyKey) setIdempotent(`scans:${idempotencyKey}`, analysis);
 
     return NextResponse.json(analysis);
   } catch (error) {

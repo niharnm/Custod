@@ -18,3 +18,14 @@ export async function GET(
   }
   return NextResponse.json({ check });
 }
+
+export async function DELETE(
+  request: Request,
+  { params }: { params: Promise<{ slug: string }> }
+) {
+  const { slug } = await params;
+  const deviceId = request.headers.get("X-Custod-Device") ?? undefined;
+  const revoked = await getScanStore().revokeShare(slug, deviceId);
+  if (!revoked) return NextResponse.json({ error: "Share link not found." }, { status: 404 });
+  return NextResponse.json({ ok: true });
+}

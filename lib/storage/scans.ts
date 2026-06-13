@@ -51,6 +51,7 @@ type ScanStore = {
   updatePrivacy(patch: Partial<PrivacySettings>, deviceId?: string): Promise<PrivacySettings>;
   createShare(scanId: string, options: { includeRawTabs?: boolean; expiresInHours?: number }, deviceId?: string): Promise<{ slug: string; url: string; expiresAt: string } | null>;
   getSharedScan(slug: string): Promise<Scan | null>;
+  revokeShare(slug: string, deviceId?: string): Promise<boolean>;
   exportData(deviceId?: string): Promise<DataExport>;
   deleteData(deviceId?: string): Promise<{ scans: number; reflections: number; shares: number }>;
 };
@@ -170,6 +171,14 @@ class MemoryScanStore implements ScanStore {
     if (!share || share.revokedAt || new Date(share.expiresAt).getTime() < Date.now()) return null;
     const scan = this.scans.get(share.scanId);
     return scan ? publicScan(scan, share.includeRawTabs) : null;
+  }
+
+  async revokeShare(slug: string, deviceId?: string) {
+    const share = this.shares.get(slug);
+    if (!share) return false;
+    if (deviceId && share.deviceId && share.deviceId !== deviceId) return false;
+    this.shares.set(slug, { ...share, revokedAt: new Date().toISOString() });
+    return true;
   }
 
   async exportData(deviceId?: string) {
@@ -383,6 +392,14 @@ class SupabaseScanStore implements ScanStore {
     if (!data || data.revoked_at || (data.expires_at && new Date(data.expires_at).getTime() < Date.now())) return null;
     const scan = await this.getScan(data.scan_id);
     return scan ? publicScan(scan, Boolean(data.include_raw_tabs)) : null;
+  }
+
+  async revokeShare(slug: string, deviceId?: string) {
+    let builder = this.supabase.from("share_links").update({ revoked_at: new Date().toISOString() }).eq("slug", slug);
+    if (deviceId) builder = builder.eq("device_id", deviceId);
+    const { error } = await query(builder);
+    if (error) throw new Error(error.message);
+    return true;
   }
 
   async exportData(deviceId?: string) {
