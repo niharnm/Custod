@@ -55,7 +55,7 @@ export function AudienceCtaSection() {
           className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row"
         >
           <Link
-            href={AUDIENCE.ctaEmail}
+            href={AUDIENCE.ctaPrimaryHref}
             className="custod-primary-button min-w-[180px] rounded-lg px-5 py-3 text-sm font-medium text-white transition hover:scale-[1.03] active:scale-[0.97]"
           >
             {AUDIENCE.ctaPrimary}

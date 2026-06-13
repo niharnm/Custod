@@ -76,10 +76,10 @@ export function HeroSection() {
             className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row"
           >
             <Link
-              href="mailto:hello@custod.app?subject=Custod%20Waitlist"
+              href="/login"
               className="custod-primary-button min-w-[200px] rounded-lg px-5 py-3 text-sm font-medium text-white transition hover:scale-[1.03] active:scale-[0.97]"
             >
-              Join waitlist
+              Get started free
             </Link>
             <Link
               href="#how-it-works"

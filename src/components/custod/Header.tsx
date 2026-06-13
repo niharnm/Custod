@@ -4,11 +4,29 @@ import { Menu, X } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { NAV_LINKS } from "@/lib/custod-content";
+import { getSupabaseBrowser, isSupabaseConfigured } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 
 export function Header() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [showFloatingCta, setShowFloatingCta] = useState(false);
+  const [signedIn, setSignedIn] = useState(false);
+
+  // Signed-in visitors get a direct link to their dashboard; everyone else
+  // sees "Log in".
+  const accountHref = signedIn ? "/dashboard" : "/login";
+  const accountLabel = signedIn ? "Dashboard" : "Log in";
+
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+    const supabase = getSupabaseBrowser();
+    if (!supabase) return;
+    supabase.auth.getSession().then(({ data }) => setSignedIn(Boolean(data.session)));
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) =>
+      setSignedIn(Boolean(session)),
+    );
+    return () => sub.subscription.unsubscribe();
+  }, []);
 
   useEffect(() => {
     const onScroll = () => {
@@ -48,10 +66,10 @@ export function Header() {
 
           <div className="hidden items-center gap-3 md:flex">
             <Link
-              href="/login"
+              href={accountHref}
               className="rounded-lg border border-white/20 bg-white/10 px-4 py-2 text-sm font-medium text-white backdrop-blur-sm transition hover:scale-[1.02] hover:bg-white/15"
             >
-              Log in
+              {accountLabel}
             </Link>
             <Link
               href="/download"
@@ -116,8 +134,8 @@ export function Header() {
                   {link.label}
                 </Link>
               ))}
-              <Link href="/login" className="text-lg font-medium" onClick={() => setMenuOpen(false)}>
-                Log in
+              <Link href={accountHref} className="text-lg font-medium" onClick={() => setMenuOpen(false)}>
+                {accountLabel}
               </Link>
             </nav>
             <Link

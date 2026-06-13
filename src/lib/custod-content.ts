@@ -239,8 +239,8 @@ export const AUDIENCE = {
   subtitle:
     "Students and young professionals who work across multiple devices and would never self-report stress into a wellness app.",
   body: "Custod requires no behavior change and no active input. You plug it in, grant permissions once, and it runs silently in the background of your existing workflow — watching, scoring, and only speaking up when it matters.",
-  ctaPrimary: "Join waitlist",
-  ctaEmail: "mailto:hello@custod.app?subject=Custod%20Waitlist",
+  ctaPrimary: "Get started free",
+  ctaPrimaryHref: "/login",
   ctaSecondary: "Learn how it works",
   ctaSecondaryHref: "#how-it-works",
 } as const;
@@ -262,9 +262,10 @@ export const FOOTER_GROUPS: FooterLinkGroup[] = [
     ],
   },
   {
-    title: "Connect",
+    title: "Account",
     links: [
-      { label: "Join waitlist", href: "mailto:hello@custod.app?subject=Custod%20Waitlist" },
+      { label: "Sign in", href: "/login" },
+      { label: "Dashboard", href: "/dashboard" },
       { label: "Contact", href: "mailto:hello@custod.app" },
     ],
   },
