@@ -8,8 +8,9 @@ export default defineConfig([
   globalIgnores([
     ".next/**",
     ".custod-data/**",
-    "extension/dist/**",
-    "extension/node_modules/**",
+    "extension/**",
+    "website/**",
+    "macos/**",
     "node_modules/**",
     "out/**"
   ])
