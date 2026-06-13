@@ -8,9 +8,15 @@ import Foundation
 // user sees always adds up to the score. Pure and deterministic, no network.
 //
 // Factor budget (max points):
-//   Tab overload 16 · Context switching 12 · Distraction loop 14 ·
-//   Goal fragmentation 10 · Time & energy pressure 14   (tabs + mood = 66)
-//   Screen time 12 · No recent break 14 · Late-night use 8   (usage = 34)
+//   Tab overload 12 · Context switching 8 · Distraction loop 12 ·
+//   Goal fragmentation 8 · Time & energy pressure 12   (tabs + mood = 52)
+//   Screen time 12 · No recent break 12 · Late-night use 6   (usage = 30)
+//   App juggling 10 · Active workload 8   (whole-Mac app usage = 18)
+//
+// The macOS app deliberately scores more than just open tabs: it also measures
+// how hard you're actually working across *every* application — how many apps
+// you're juggling and how much active app time you've put in today — so a person
+// grinding in one focused app still registers, not only someone with 30 tabs open.
 
 enum BurnoutAnalyzer {
 
@@ -108,7 +114,8 @@ enum BurnoutAnalyzer {
     }
 
     private static func riskSignals(_ tabs: [BrowserTab], _ groups: [EvidenceGroup],
-                                    _ mood: MoodCheckIn?, _ usage: UsageStats?) -> [RiskSignal] {
+                                    _ mood: MoodCheckIn?, _ usage: UsageStats?,
+                                    _ appUsage: AppUsageSnapshot?) -> [RiskSignal] {
         let totalTabs = tabs.count
         let domainCount = Set(tabs.map(\.domain).filter { !$0.isEmpty }).count
         func tabsFor(_ name: String) -> [BrowserTab] { groups.first { $0.name == name }?.tabs ?? [] }
@@ -122,7 +129,7 @@ enum BurnoutAnalyzer {
 
         // --- Tab + mood factors (max 66) ---
 
-        let overloadMax = 16
+        let overloadMax = 12
         let overload = cap(Double(totalTabs - 6) * 1.4, overloadMax)
         signals.append(.init(
             id: "tab-overload", label: "Tab overload", level: level(overload, overloadMax), score: overload,
@@ -131,22 +138,22 @@ enum BurnoutAnalyzer {
                 : "Your open-tab count is still manageable, so it adds little.",
             evidence: ["\(totalTabs) open tab\(totalTabs == 1 ? "" : "s")"]))
 
-        let switchMax = 12
-        let switching = cap(Double(domainCount) * 0.8 + Double(activeGroups) * 1.6, switchMax)
+        let switchMax = 8
+        let switching = cap(Double(domainCount) * 0.6 + Double(activeGroups) * 1.2, switchMax)
         signals.append(.init(
             id: "context-switching", label: "Context switching", level: level(switching, switchMax), score: switching,
             explanation: "More distinct sites and task types means more mental gear-changes. Switching leaves 'attention residue' that erodes focus — the wider the spread, the more this adds.",
             evidence: ["\(domainCount) domain\(domainCount == 1 ? "" : "s")", "\(activeGroups) task type\(activeGroups == 1 ? "" : "s")"]))
 
-        let distractionMax = 14
-        let distraction = cap(Double(distractionTabs.count) * 3.5 + (deadlineTabs.isEmpty ? 0 : 4), distractionMax)
+        let distractionMax = 12
+        let distraction = cap(Double(distractionTabs.count) * 3.0 + (deadlineTabs.isEmpty ? 0 : 4), distractionMax)
         signals.append(.init(
             id: "distraction-loop", label: "Distraction loop", level: level(distraction, distractionMax), score: distraction,
             explanation: "Entertainment or social tabs open alongside deadline tabs are an early avoidance signal. The mix adds more than either alone.",
             evidence: ["\(distractionTabs.count) distraction tab\(distractionTabs.count == 1 ? "" : "s")"]))
 
-        let fragMax = 10
-        let fragmentation = cap(Double(researchTabs.count) * 1.6 + Double(communicationTabs.count) * 1.4 + Double(activeGroups) * 0.8, fragMax)
+        let fragMax = 8
+        let fragmentation = cap(Double(researchTabs.count) * 1.3 + Double(communicationTabs.count) * 1.1 + Double(activeGroups) * 0.6, fragMax)
         signals.append(.init(
             id: "goal-fragmentation", label: "Goal fragmentation", level: level(fragmentation, fragMax), score: fragmentation,
             explanation: "Research, messaging, and admin surfaces left open together pull your goal in several directions at once, fragmenting progress.",
@@ -155,7 +162,7 @@ enum BurnoutAnalyzer {
                 "\(communicationTabs.count) comms tab\(communicationTabs.count == 1 ? "" : "s")"
             ]))
 
-        let pressureMax = 14
+        let pressureMax = 12
         let pressureRaw =
             (mood?.timePressure == .high ? 9.0 : mood?.timePressure == .some ? 4.0 : 0.0) +
             (mood.map { Double($0.stress) * 1.2 } ?? 0) +
@@ -180,19 +187,49 @@ enum BurnoutAnalyzer {
                 explanation: "Prolonged screen exposure tires the eyes and attention system. Past about two active hours, fatigue climbs steadily, so this contributes more the longer you go.",
                 evidence: ["\(durationText(u.activeMinutesToday)) active on this Mac today"]))
 
-            let breakMax = 14
+            let breakMax = 12
             let noBreak = cap(Double(u.continuousMinutes - 45) / 6.0, breakMax)
             signals.append(.init(
                 id: "continuous-focus", label: "No recent break", level: level(noBreak, breakMax), score: noBreak,
                 explanation: "Working with no real pause keeps stress hormones elevated — your brain never resets. After ~45 minutes the cost of pushing on rises quickly.",
                 evidence: [u.onBreak ? "currently on a break" : "\(durationText(u.continuousMinutes)) since your last break"]))
 
-            let nightMax = 8
+            let nightMax = 6
             let night = lateNightPoints(u.hour, nightMax)
             signals.append(.init(
                 id: "late-night", label: "Late-night use", level: level(night, nightMax), score: night,
                 explanation: "Screen time late at night suppresses melatonin and worsens next-day fatigue, which compounds burnout over days.",
                 evidence: [String(format: "active around %02d:00", u.hour)]))
+        }
+
+        // --- Whole-Mac application factors (max 18) ---
+        // The point of the desktop app: score actual work across every app, not
+        // just how many tabs are open.
+
+        if let app = appUsage, app.totalMinutes > 0 || !app.apps.isEmpty {
+            let distinct = app.distinctApps
+            let total = app.totalMinutes
+            let topApps = app.apps.prefix(3).map(\.name)
+
+            let jugglingMax = 10
+            // Beyond ~4 apps in a day, every extra app is another context to hold.
+            let juggling = cap(Double(distinct - 4) * 1.4, jugglingMax)
+            signals.append(.init(
+                id: "app-juggling", label: "App juggling", level: level(juggling, jugglingMax), score: juggling,
+                explanation: "Switching between many apps — not just tabs — fragments attention across your whole Mac. Each app is a separate context your brain has to reload, and the cost climbs with the count.",
+                evidence: [
+                    "\(distinct) app\(distinct == 1 ? "" : "s") used today",
+                    topApps.isEmpty ? "no app activity yet" : "most used: \(topApps.joined(separator: ", "))"
+                ]))
+
+            let workloadMax = 8
+            // Active work climbs past ~4h of real app time; this captures grinding
+            // hard in even a single app, which open-tab counts completely miss.
+            let workload = cap(Double(total - 240) / 22.0, workloadMax)
+            signals.append(.init(
+                id: "active-workload", label: "Active workload", level: level(workload, workloadMax), score: workload,
+                explanation: "This is how much you've actually been working through today across all apps, not how many things you have open. A long, dense day of real app use raises burnout risk on its own.",
+                evidence: ["\(durationText(total)) of active app use today"]))
         }
 
         return signals
@@ -231,6 +268,8 @@ enum BurnoutAnalyzer {
         case "screen-time":      first = "Step fully away from the screen — look at something 20 feet away for 20 seconds."
         case "continuous-focus": first = "Stand up and leave the desk. This stretch has run long without a real break."
         case "late-night":       first = "Set a hard stop. Late screen time is borrowing from tomorrow's focus."
+        case "app-juggling":     first = "Quit the apps you're not using this hour — get down to the one or two the task actually needs."
+        case "active-workload":  first = "You've already put in a heavy block today. Step fully away before the next push, not after it."
         default:                 first = "Pick the single surface that matches what you actually owe right now."
         }
 
@@ -258,12 +297,13 @@ enum BurnoutAnalyzer {
 
     /// Legacy entry point (tabs + mood only). Used where usage isn't available.
     static func analyze(tabs: [BrowserTab], mood: MoodCheckIn?) -> BurnoutAnalysis {
-        analyze(tabs: tabs, mood: mood, usage: nil)
+        analyze(tabs: tabs, mood: mood, usage: nil, appUsage: nil)
     }
 
-    static func analyze(tabs: [BrowserTab], mood: MoodCheckIn?, usage: UsageStats?) -> BurnoutAnalysis {
+    static func analyze(tabs: [BrowserTab], mood: MoodCheckIn?, usage: UsageStats?,
+                        appUsage: AppUsageSnapshot? = nil) -> BurnoutAnalysis {
         let evidenceGroups = groupTabs(tabs)
-        let riskBreakdown = riskSignals(tabs, evidenceGroups, mood, usage)
+        let riskBreakdown = riskSignals(tabs, evidenceGroups, mood, usage, appUsage)
         let score = min(100, riskBreakdown.reduce(0) { $0 + $1.score })
         let status = status(from: score)
         let pattern = mainPattern(riskBreakdown)
@@ -284,7 +324,7 @@ enum BurnoutAnalyzer {
             resetPlan: resetPlan(status, riskBreakdown),
             evidenceGroups: evidenceGroups,
             reflectionPrompt: reflection,
-            privacySummary: "Custod analyzed only tab titles, URLs, active state, optional check-in values, and on-device screen-time timing. It never read page contents."
+            privacySummary: "Custod analyzed only tab titles, URLs, active state, optional check-in values, and on-device usage timing (screen time and which apps were active, by name). It never read page contents or anything inside your apps."
         )
     }
 }

@@ -79,6 +79,15 @@ struct BurnoutAnalysis: Codable, Hashable {
     var evidenceGroups: [EvidenceGroup]
     var reflectionPrompt: String
     var privacySummary: String
+
+    /// Plain-language reasons from the AI layer for *why* this status reads the
+    /// way it does, weighing multiple factors. nil until the (optional) Groq
+    /// pass returns; the deterministic score above never depends on it.
+    var aiReasoning: [String]? = nil
+
+    /// One-sentence AI read shown under the main pattern. nil when AI is off or
+    /// hasn't returned yet — the UI falls back to `patternExplanation`.
+    var aiSummary: String? = nil
 }
 
 struct BurnoutCheckRecord: Codable, Identifiable, Hashable {

@@ -251,6 +251,7 @@ private struct DashboardView: View {
                 topBar
                 heroCard
                 statsGrid
+                appsCard
                 if let a = monitor.analysis {
                     factorsCard(a)
                     resetCard(a)
@@ -276,7 +277,7 @@ private struct DashboardView: View {
     }
 
     private var heroSubtitle: String {
-        if let a = monitor.analysis { return a.patternExplanation }
+        if let a = monitor.analysis { return a.aiSummary ?? a.patternExplanation }
         if !monitor.note.isEmpty { return monitor.note }
         return "Custod is watching your open tabs in real time and will surface burnout patterns as they emerge."
     }
@@ -314,20 +315,48 @@ private struct DashboardView: View {
 
     private var heroCard: some View {
         Card {
-            HStack(alignment: .center, spacing: 24) {
-                ScoreGauge(score: monitor.analysis?.score ?? 0, status: monitor.analysis?.status)
-                VStack(alignment: .leading, spacing: 10) {
-                    modePill
-                    Text(monitor.analysis?.mainPattern ?? "Monitoring your focus")
-                        .font(.system(.title2, design: .rounded).weight(.bold))
-                    Text(heroSubtitle)
+            VStack(alignment: .leading, spacing: 16) {
+                HStack(alignment: .center, spacing: 24) {
+                    ScoreGauge(score: monitor.analysis?.score ?? 0, status: monitor.analysis?.status)
+                    VStack(alignment: .leading, spacing: 10) {
+                        modePill
+                        Text(monitor.analysis?.mainPattern ?? "Monitoring your focus")
+                            .font(.system(.title2, design: .rounded).weight(.bold))
+                        Text(heroSubtitle)
+                            .font(.system(.subheadline, design: .rounded))
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    Spacer(minLength: 0)
+                }
+                if let reasons = monitor.analysis?.aiReasoning, !reasons.isEmpty {
+                    aiReasoningBlock(reasons)
+                }
+            }
+        }
+    }
+
+    /// The "AI actually thought about it" panel — concrete, multi-factor reasons
+    /// the model gave for the current status. Only shown when AI reasoning is on
+    /// and a pass has returned.
+    private func aiReasoningBlock(_ reasons: [String]) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label("Why Custod thinks this", systemImage: "sparkles")
+                .font(.system(.caption, design: .rounded).weight(.semibold))
+                .foregroundStyle(Color.brand)
+            ForEach(Array(reasons.enumerated()), id: \.offset) { _, reason in
+                HStack(alignment: .top, spacing: 8) {
+                    Circle().fill(Color.brand).frame(width: 4, height: 4).padding(.top, 7)
+                    Text(reason)
                         .font(.system(.subheadline, design: .rounded))
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                Spacer(minLength: 0)
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(12)
+        .background(RoundedRectangle(cornerRadius: 12).fill(Color.brand.opacity(0.08)))
     }
 
     private func hm(_ minutes: Int) -> String {
@@ -354,6 +383,68 @@ private struct DashboardView: View {
                        color: top.map { riskColor($0.level) } ?? .secondary, icon: "exclamationmark.triangle.fill")
             MetricCard(label: "Healthy streak", value: streak == 1 ? "1 day" : "\(streak) days",
                        color: streak > 0 ? Color.brand : .secondary, icon: "flame.fill")
+        }
+    }
+
+    private var appsCard: some View {
+        let snap = monitor.appUsage
+        let apps = Array((snap?.apps ?? []).prefix(6))
+        let maxMin = max(apps.first?.minutes ?? 1, 1)
+        return Card {
+            HStack {
+                Label("Apps today", systemImage: "square.grid.2x2.fill")
+                    .font(.system(.headline, design: .rounded))
+                Spacer()
+                if let s = snap, s.totalMinutes > 0 {
+                    Text("\(hm(s.totalMinutes)) · \(s.distinctApps) app\(s.distinctApps == 1 ? "" : "s")")
+                        .font(.system(.caption, design: .rounded)).foregroundStyle(.secondary)
+                }
+            }
+            if !monitor.usesSystemScreenTime {
+                HStack(alignment: .top, spacing: 8) {
+                    Image(systemName: "exclamationmark.circle.fill").foregroundStyle(Color.warn)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("These are estimates since Custod launched. Turn on Full Disk Access to use your Mac's real Screen Time — the whole day, every app.")
+                            .font(.system(.caption, design: .rounded)).foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Button { Permissions.openSettings(.fullDiskAccess) } label: {
+                            Text("Open Full Disk Access settings")
+                                .font(.system(.caption, design: .rounded).weight(.semibold))
+                        }
+                        .buttonStyle(.link).tint(Color.brand)
+                    }
+                }
+                .padding(10)
+                .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Color.warn.opacity(0.10)))
+            }
+            if apps.isEmpty {
+                Text("Custod is learning which apps you use across your whole Mac. This fills in as you work — not just your browser tabs.")
+                    .font(.system(.subheadline, design: .rounded)).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else {
+                VStack(spacing: 10) {
+                    ForEach(apps) { app in
+                        HStack(spacing: 12) {
+                            Text(app.name)
+                                .font(.system(.subheadline, design: .rounded).weight(.medium))
+                                .lineLimit(1)
+                                .frame(width: 150, alignment: .leading)
+                            GeometryReader { geo in
+                                ZStack(alignment: .leading) {
+                                    Capsule().fill(Color.primary.opacity(0.06))
+                                    Capsule().fill(Color.brand.opacity(0.7))
+                                        .frame(width: max(6, geo.size.width * CGFloat(app.minutes) / CGFloat(maxMin)))
+                                }
+                            }
+                            .frame(height: 10)
+                            Text(hm(app.minutes))
+                                .font(.system(.caption, design: .rounded).monospacedDigit())
+                                .foregroundStyle(.secondary)
+                                .frame(width: 60, alignment: .trailing)
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -584,6 +675,7 @@ private struct SettingsView: View {
                 } else {
                     interventionCard
                     sensitivityCard
+                    aiCard
                     supervisedCard
                 }
             }
@@ -624,6 +716,39 @@ private struct SettingsView: View {
                  + (s.triggerOnYellow ? " Also acts on sustained yellow." : ""))
                 .font(.system(.caption, design: .rounded)).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private var aiCard: some View {
+        Card {
+            HStack {
+                Label("AI reasoning", systemImage: "sparkles")
+                    .font(.system(.headline, design: .rounded).weight(.bold))
+                Spacer()
+                Toggle("", isOn: $settings.aiReasoningEnabled).labelsHidden()
+                    .toggleStyle(.switch).tint(Color.brand)
+            }
+            Text("Custod scores you locally on its own. With this on, it also asks an AI (Groq) to reason about *why* a session looks strained — weighing your tabs, mood, screen time, breaks, and how many apps you're juggling — instead of assuming more open tabs means more stress.")
+                .font(.system(.caption, design: .rounded)).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            Text("Sends only tab titles/URLs and timing numbers to Groq — never page contents or anything inside your apps. Turn it off to keep Custod fully on-device.")
+                .font(.system(.caption2, design: .rounded)).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            if settings.aiReasoningEnabled {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Groq API key").font(.system(.caption, design: .rounded).weight(.semibold))
+                    SecureField(settings.resolvedGroqKey.isEmpty ? "Paste your Groq API key" : "Using bundled key — paste to override",
+                                text: $settings.groqAPIKeyOverride)
+                        .textFieldStyle(.roundedBorder)
+                        .font(.system(.caption, design: .monospaced))
+                    Text(settings.aiReasoningActive
+                         ? "Connected. Reasoning appears on the dashboard within a few seconds of a status change."
+                         : "No key available yet — paste one above to enable AI reasoning.")
+                        .font(.system(.caption2, design: .rounded))
+                        .foregroundStyle(settings.aiReasoningActive ? Color.brand : .secondary)
+                }
+                .padding(.top, 2)
+            }
         }
     }
 

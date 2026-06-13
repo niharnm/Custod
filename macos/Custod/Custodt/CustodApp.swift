@@ -22,7 +22,15 @@ struct CustodApp: App {
                 .task {
                     monitor.attach(history: history, settings: settings)
                     monitor.start()
-                    if settings.notificationsEnabled { Notifier.requestAuthorization() }
+                }
+                // On first launch, explain why each permission is needed *before*
+                // the system prompts fire — the "Grant access" button in the sheet
+                // is what actually triggers them.
+                .sheet(isPresented: Binding(
+                    get: { !settings.hasOnboarded },
+                    set: { if !$0 { settings.hasOnboarded = true } }
+                )) {
+                    OnboardingView().environmentObject(settings)
                 }
         }
         .windowResizability(.contentSize)

@@ -78,6 +78,17 @@ final class SettingsStore: ObservableObject {
     @Published var sensitivity: Sensitivity            { didSet { d.set(sensitivity.rawValue, forKey: Key.sensitivity) } }
     @Published var notificationsEnabled: Bool          { didSet { d.set(notificationsEnabled, forKey: Key.notifications) } }
     @Published var supervisedMode: Bool                { didSet { d.set(supervisedMode, forKey: Key.supervised); if !supervisedMode { sessionUnlocked = false } } }
+    @Published var hasOnboarded: Bool                  { didSet { d.set(hasOnboarded, forKey: Key.onboarded) } }
+
+    /// Opt-in: when on, Custod adds an AI reasoning pass (Groq) that explains
+    /// *why* a session reads as strained, weighing multiple factors. Sends tab
+    /// titles/URLs and timing to Groq's cloud — off by default so the app stays
+    /// fully local unless the user chooses otherwise.
+    @Published var aiReasoningEnabled: Bool            { didSet { d.set(aiReasoningEnabled, forKey: Key.aiEnabled) } }
+
+    /// User-supplied Groq key. Empty means fall back to env / bundled default.
+    @Published var groqAPIKeyOverride: String          { didSet { d.set(groqAPIKeyOverride, forKey: Key.groqKey) } }
+
     @Published private(set) var pinHash: String?       { didSet { d.set(pinHash, forKey: Key.pin) } }
 
     /// Whether the supervisor has unlocked controls for this session (not persisted).
@@ -89,7 +100,10 @@ final class SettingsStore: ObservableObject {
         static let sensitivity = "custod.sensitivity"
         static let notifications = "custod.notifications"
         static let supervised = "custod.supervised"
+        static let onboarded = "custod.onboarded"
         static let pin = "custod.pinHash"
+        static let aiEnabled = "custod.aiReasoningEnabled"
+        static let groqKey = "custod.groqAPIKey"
     }
 
     init() {
@@ -98,7 +112,27 @@ final class SettingsStore: ObservableObject {
         sensitivity = Sensitivity(rawValue: d.string(forKey: Key.sensitivity) ?? "") ?? .balanced
         notificationsEnabled = d.object(forKey: Key.notifications) as? Bool ?? true
         supervisedMode = d.bool(forKey: Key.supervised)
+        hasOnboarded = d.bool(forKey: Key.onboarded)
+        // Default ON; aiReasoningActive still gates on a key actually being
+        // present, so nothing is sent until the user provides one (Settings or
+        // GROQ_API_KEY). Users can turn it off to keep the app fully local.
+        aiReasoningEnabled = d.object(forKey: Key.aiEnabled) as? Bool ?? true
+        groqAPIKeyOverride = d.string(forKey: Key.groqKey) ?? ""
         pinHash = d.string(forKey: Key.pin)
+    }
+
+    /// The Groq key to actually use: user override → env var → bundled default.
+    /// Empty string means "no key available".
+    var resolvedGroqKey: String {
+        let override = groqAPIKeyOverride.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !override.isEmpty { return override }
+        if let env = AIConfig.environmentKey { return env }
+        return AIConfig.bundledDefaultKey
+    }
+
+    /// AI reasoning is usable only when the toggle is on and a key exists.
+    var aiReasoningActive: Bool {
+        aiReasoningEnabled && !resolvedGroqKey.isEmpty
     }
 
     var hasPIN: Bool { pinHash != nil }

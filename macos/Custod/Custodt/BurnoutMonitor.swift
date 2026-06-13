@@ -19,6 +19,10 @@ final class BurnoutMonitor: ObservableObject {
     @Published private(set) var note = ""
     @Published private(set) var isActive = false
     @Published private(set) var usage: UsageStats?
+    @Published private(set) var appUsage: AppUsageSnapshot?
+    /// True once macOS's own Screen Time data is readable (Full Disk Access granted).
+    /// While false, screen-time figures are Custod's live since-launch estimate.
+    @Published private(set) var usesSystemScreenTime = false
 
     // Autopilot break state, observed by the UI to present a reset overlay.
     @Published private(set) var breakActive = false
@@ -33,12 +37,19 @@ final class BurnoutMonitor: ObservableObject {
     let intervalSeconds: Double = 20
 
     private let usageTracker = UsageTracker()
+    private let appTracker = AppUsageTracker()
     private var lastUsage: UsageStats?
     private var loopTask: Task<Void, Never>?
     private weak var history: HistoryStore?
     private var settings: SettingsStore?
     private var lastLoggedStatus: BurnoutStatus?
     private var lastInterventionAt: Date?
+
+    // AI reasoning (Groq) state. We only call out when the picture meaningfully
+    // changes — keyed by a signature — so we don't hit the API every 20s tick.
+    private var reasoningTask: Task<Void, Never>?
+    private var lastReasonedSignature: String?
+    private var lastReasoning: (summary: String, reasons: [String])?
 
     func attach(history: HistoryStore, settings: SettingsStore) {
         self.history = history
@@ -61,6 +72,8 @@ final class BurnoutMonitor: ObservableObject {
         isActive = false
         loopTask?.cancel()
         loopTask = nil
+        reasoningTask?.cancel()
+        reasoningTask = nil
     }
 
     func toggle() { isActive ? stop() : start() }
@@ -86,49 +99,122 @@ final class BurnoutMonitor: ObservableObject {
     // MARK: Internals
 
     private func reanalyzeLocally() {
-        guard !tabs.isEmpty else { return }
-        analysis = BurnoutAnalyzer.analyze(tabs: tabs, mood: mood, usage: lastUsage)
+        guard lastUsage != nil || !tabs.isEmpty || appUsage != nil else { return }
+        var a = BurnoutAnalyzer.analyze(tabs: tabs, mood: mood, usage: lastUsage, appUsage: appUsage)
+        attachReasoning(to: &a)
+        analysis = a
         lastChecked = Date()
+        maybeReason(a)
     }
 
     private func tick() async {
         // Sample real usage every tick, even if the browser is closed, so screen
         // time and break tracking stay accurate.
-        let u = usageTracker.sample()
+        var u = usageTracker.sample()
+        let live = appTracker.sample()
+
+        // Prefer macOS's real Screen Time data (whole day, all apps) when Full Disk
+        // Access is granted; otherwise fall back to Custod's live since-launch count.
+        if let system = ScreenTimeReader.today() {
+            usesSystemScreenTime = true
+            u.activeMinutesToday = system.totalMinutes
+            appUsage = AppUsageSnapshot(apps: system.apps,
+                                        totalMinutes: system.totalMinutes,
+                                        frontApp: live.frontApp)
+        } else {
+            usesSystemScreenTime = false
+            appUsage = live
+        }
+
         usage = u
         lastUsage = u
 
-        guard let browser = TabImporter.defaultBrowser() else {
-            note = "\(TabImporter.defaultBrowserName()) isn't supported for auto-monitoring yet."
+        // Read browser tabs when we can, but they're just one input now: analysis
+        // runs every tick from app + usage signals so Custod keeps scoring your
+        // workload even with the browser closed.
+        var imported: [BrowserTab] = []
+        if let browser = TabImporter.defaultBrowser() {
+            sourceBrowser = browser.rawValue
+            if TabImporter.isRunning(browser) {
+                do {
+                    imported = try TabImporter.importTabs(from: browser)
+                    note = imported.isEmpty ? "No open tabs in \(browser.rawValue) — scoring your app activity." : ""
+                } catch {
+                    note = error.localizedDescription
+                }
+            } else {
+                note = "\(browser.rawValue) is closed — scoring your app activity."
+            }
+        } else {
+            note = "\(TabImporter.defaultBrowserName()) isn't supported for tabs yet — scoring your app activity."
+        }
+        tabs = imported
+
+        var a = BurnoutAnalyzer.analyze(tabs: imported, mood: mood, usage: u, appUsage: appUsage)
+        attachReasoning(to: &a)
+        analysis = a
+        lastChecked = Date()
+
+        if a.status != lastLoggedStatus {
+            lastLoggedStatus = a.status
+            history?.add(BurnoutCheckRecord(rawTabs: imported, mood: mood, analysis: a))
+        }
+
+        maybeIntervene(a)
+        maybeReason(a)
+    }
+
+    // MARK: AI reasoning (optional, opt-in)
+
+    /// What makes one analysis "the same" for caching purposes. Small score
+    /// jitter (±5) shouldn't trigger a fresh API call; a status, pattern, or
+    /// tab-count change should.
+    private func signature(_ a: BurnoutAnalysis) -> String {
+        "\(a.status.rawValue)|\(a.mainPattern)|\(a.score / 5)|\(tabs.count)"
+    }
+
+    /// Carry the most recent AI reasoning onto a freshly computed analysis when
+    /// it still describes the same situation, so the UI doesn't flicker between
+    /// ticks while the (debounced) next call is pending.
+    private func attachReasoning(to a: inout BurnoutAnalysis) {
+        guard let r = lastReasoning, lastReasonedSignature == signature(a) else { return }
+        a.aiSummary = r.summary
+        a.aiReasoning = r.reasons
+    }
+
+    /// Fire a Groq reasoning pass if AI is enabled and the situation changed.
+    private func maybeReason(_ a: BurnoutAnalysis) {
+        guard let s = settings, s.aiReasoningActive else {
+            // Reset so re-enabling AI reasons immediately on the next tick.
+            lastReasonedSignature = nil
             return
         }
-        sourceBrowser = browser.rawValue
+        let sig = signature(a)
+        guard sig != lastReasonedSignature else { return }
+        lastReasonedSignature = sig // claim now: at most one call per signature
 
-        guard TabImporter.isRunning(browser) else {
-            note = "Open \(browser.rawValue) to start monitoring your focus."
-            return
+        let key = s.resolvedGroqKey
+        let tabsSnapshot = tabs
+        let moodSnapshot = mood
+        let usageSnapshot = lastUsage
+        let appSnapshot = appUsage
+        reasoningTask?.cancel()
+        reasoningTask = Task { [weak self] in
+            guard let result = try? await GroqReasoner.reason(
+                analysis: a, tabs: tabsSnapshot, mood: moodSnapshot,
+                usage: usageSnapshot, appUsage: appSnapshot, apiKey: key
+            ) else { return } // silent fallback: deterministic wording stays
+            await self?.applyReasoning(result, signature: sig)
         }
+    }
 
-        do {
-            let imported = try TabImporter.importTabs(from: browser)
-            tabs = imported
-            guard !imported.isEmpty else {
-                note = "No open tabs in \(browser.rawValue) right now."
-                return
-            }
-            note = ""
-            let a = BurnoutAnalyzer.analyze(tabs: imported, mood: mood, usage: u)
-            analysis = a
-            lastChecked = Date()
-
-            if a.status != lastLoggedStatus {
-                lastLoggedStatus = a.status
-                history?.add(BurnoutCheckRecord(rawTabs: imported, mood: mood, analysis: a))
-            }
-
-            maybeIntervene(a)
-        } catch {
-            note = error.localizedDescription
+    private func applyReasoning(_ result: GroqReasoner.Result, signature sig: String) {
+        lastReasoning = (result.summary, result.reasons)
+        // Only update the visible analysis if it still matches what we reasoned about.
+        if var current = analysis, signature(current) == sig {
+            current.aiSummary = result.summary
+            current.aiReasoning = result.reasons
+            analysis = current
         }
     }
 
