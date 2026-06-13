@@ -46,12 +46,18 @@ export function Header() {
             ))}
           </nav>
 
-          <div className="hidden md:block">
+          <div className="hidden items-center gap-3 md:flex">
             <Link
-              href="mailto:hello@custod.app?subject=Custod%20Waitlist"
+              href="/login"
+              className="rounded-lg border border-white/20 bg-white/10 px-4 py-2 text-sm font-medium text-white backdrop-blur-sm transition hover:scale-[1.02] hover:bg-white/15"
+            >
+              Log in
+            </Link>
+            <Link
+              href="/download"
               className="custod-primary-button rounded-lg px-4 py-2.5 text-sm font-medium text-white transition hover:scale-[1.03] active:scale-[0.97]"
             >
-              Join waitlist
+              Add to Chrome
             </Link>
           </div>
 
@@ -73,10 +79,10 @@ export function Header() {
         )}
       >
         <Link
-          href="mailto:hello@custod.app?subject=Custod%20Waitlist"
+          href="/download"
           className="custod-primary-button rounded-lg px-4 py-2.5 text-sm font-medium text-white shadow-lg"
         >
-          Join waitlist
+          Add to Chrome
         </Link>
       </div>
 
@@ -110,13 +116,16 @@ export function Header() {
                   {link.label}
                 </Link>
               ))}
+              <Link href="/login" className="text-lg font-medium" onClick={() => setMenuOpen(false)}>
+                Log in
+              </Link>
             </nav>
             <Link
-              href="mailto:hello@custod.app?subject=Custod%20Waitlist"
+              href="/download"
               className="custod-primary-button mt-8 block w-full rounded-lg px-4 py-3 text-center text-sm font-medium text-white"
               onClick={() => setMenuOpen(false)}
             >
-              Join waitlist
+              Add to Chrome
             </Link>
           </div>
         </div>
