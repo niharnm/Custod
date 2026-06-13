@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { Shield, LineChart, Settings } from "lucide-react";
+import { AuthMenu } from "@/components/AuthMenu";
 
 export function Header() {
   return (
@@ -23,11 +24,11 @@ export function Header() {
               Settings
             </Link>
           </nav>
-          <div className="flex items-center gap-1.5 rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--surface-2))] px-3 py-1.5 text-xs font-medium text-[hsl(var(--muted-foreground))]">
+          <div className="hidden items-center gap-1.5 rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--surface-2))] px-3 py-1.5 text-xs font-medium text-[hsl(var(--muted-foreground))] lg:flex">
             <Shield className="h-3 w-3" />
-            <span className="hidden md:inline">Titles &amp; URLs only — no page content</span>
-            <span className="md:hidden">Private</span>
+            <span>Titles &amp; URLs only</span>
           </div>
+          <AuthMenu />
         </div>
       </div>
     </header>

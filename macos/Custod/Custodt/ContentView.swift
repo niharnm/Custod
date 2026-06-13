@@ -166,6 +166,7 @@ struct ContentView: View {
 private struct SidebarView: View {
     @EnvironmentObject private var monitor: BurnoutMonitor
     @EnvironmentObject private var settings: SettingsStore
+    @EnvironmentObject private var auth: AuthStore
     @Binding var panel: Panel
 
     var body: some View {
@@ -201,10 +202,41 @@ private struct SidebarView: View {
 
             Spacer()
 
+            accountFooter
+
             Text("On-device only. Page contents are never read.")
                 .font(.system(.caption2, design: .rounded)).foregroundStyle(.tertiary)
         }
         .padding(16)
+    }
+
+    private var accountFooter: some View {
+        Button { panel = .settings } label: {
+            HStack(spacing: 9) {
+                Image(systemName: auth.isSignedIn
+                      ? "person.crop.circle.fill.badge.checkmark"
+                      : "person.crop.circle.badge.plus")
+                    .font(.system(size: 16))
+                    .foregroundStyle(auth.isSignedIn ? Color.brand : .secondary)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(auth.isSignedIn ? "Synced" : "Not signed in")
+                        .font(.system(.caption, design: .rounded).weight(.semibold))
+                    Text(auth.isSignedIn
+                         ? (auth.account?.email ?? "Signed in")
+                         : "Sign in to sync everywhere")
+                        .font(.system(.caption2, design: .rounded)).foregroundStyle(.secondary)
+                        .lineLimit(1).truncationMode(.middle)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(Color(nsColor: .controlBackgroundColor)))
+            .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .strokeBorder(auth.isSignedIn ? Color.brand.opacity(0.3) : Color.primary.opacity(0.06), lineWidth: 1))
+        }
+        .buttonStyle(.plain)
     }
 
     private var protectionCard: some View {
@@ -665,11 +697,14 @@ private struct HistoryView: View {
 
 private struct SettingsView: View {
     @EnvironmentObject private var settings: SettingsStore
+    @EnvironmentObject private var auth: AuthStore
+    @State private var showSignIn = false
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 Text("Settings").font(.system(.largeTitle, design: .rounded).weight(.bold))
+                accountCard
                 if settings.isLocked {
                     LockScreen()
                 } else {
@@ -682,6 +717,44 @@ private struct SettingsView: View {
             .padding(24)
             .frame(maxWidth: 760)
             .frame(maxWidth: .infinity)
+        }
+        .sheet(isPresented: $showSignIn) {
+            SignInSheet().environmentObject(auth)
+        }
+    }
+
+    private var accountCard: some View {
+        Card {
+            HStack {
+                Label("Account", systemImage: "person.crop.circle")
+                    .font(.system(.headline, design: .rounded).weight(.bold))
+                Spacer()
+                if auth.isSignedIn {
+                    Label("Synced", systemImage: "checkmark.seal.fill")
+                        .font(.system(.caption, design: .rounded).weight(.semibold))
+                        .foregroundStyle(Color.brand)
+                }
+            }
+
+            if auth.isSignedIn {
+                Text("Signed in as **\(auth.account?.email ?? "your account")**. Your checks sync to this account across the Mac app, the website, and the Chrome extension.")
+                    .font(.system(.caption, design: .rounded)).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Button(role: .destructive) { auth.signOut() } label: {
+                    Label("Sign out", systemImage: "rectangle.portrait.and.arrow.right")
+                        .font(.system(.subheadline, design: .rounded).weight(.medium))
+                }
+                .buttonStyle(.bordered)
+            } else {
+                Text("Sign in to tie your Custod data to your email. Your burnout history then follows you across the Mac app, the website, and the Chrome extension — and any checks from before sign-in are claimed onto your account.")
+                    .font(.system(.caption, design: .rounded)).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Button { showSignIn = true } label: {
+                    Label("Sign in or create account", systemImage: "arrow.right.circle.fill")
+                        .font(.system(.subheadline, design: .rounded).weight(.semibold))
+                }
+                .buttonStyle(.borderedProminent).tint(Color.brand)
+            }
         }
     }
 

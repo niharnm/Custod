@@ -156,6 +156,7 @@ export type ScanEvent = {
   id: string;
   scanId?: string;
   deviceId?: string;
+  userId?: string;
   type: ScanEventType;
   metadata: Record<string, unknown>;
   createdAt: string;

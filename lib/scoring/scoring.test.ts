@@ -88,10 +88,11 @@ describe("analyzeWithRules — golden behaviour", () => {
     expect(result.riskBreakdown.distractionPull).toBeGreaterThan(40);
   });
 
-  it("characterization: a deadline goal re-tags distraction tabs and suppresses distractionPull", () => {
-    // Documents a real quirk: because the goal string is appended to the text
-    // used for categorization, DEADLINE_WORDS in the goal make every tab parse
-    // as "deadline" first, so youtube/tiktok never become "distraction".
+  it("a deadline goal no longer suppresses distractionPull (tabs classified from their own content)", () => {
+    // Regression guard for a fixed bug: previously the goal string was folded
+    // into each tab's classification text, so DEADLINE_WORDS in the goal
+    // re-tagged youtube/tiktok/instagram as "deadline" and zeroed out the
+    // distraction signal. Tabs are now classified from their own title/url only.
     const result = analyzeWithRules({
       tabs: [
         tab("YouTube", "https://youtube.com/watch", true),
@@ -104,10 +105,11 @@ describe("analyzeWithRules — golden behaviour", () => {
       moodCheckIn: "stressed",
     });
 
-    // distractionPull collapses to the deadlineCount contribution only (12),
-    // while timePressure is driven to its ceiling by the deadline goal.
-    expect(result.riskBreakdown.distractionPull).toBe(12);
-    expect(result.riskBreakdown.timePressure).toBe(100);
+    // 3 distraction tabs are now correctly counted: 3*18 + deadline pull = 64.
+    expect(result.riskBreakdown.distractionPull).toBe(64);
+    // Time pressure comes from the goal (30) + stressed mood (25) = 55. It is no
+    // longer inflated by doc tabs being mis-tagged as deadline tabs.
+    expect(result.riskBreakdown.timePressure).toBe(55);
   });
 
   it("time pressure: deadline goal + 30m remaining + overwhelmed mood => timePressure maxed", () => {
@@ -124,7 +126,7 @@ describe("analyzeWithRules — golden behaviour", () => {
     // 30 (goalPressure) + 30 (<120m) + 18 (<45m) + deadlineCount*10 + moodRisk(45)
     // all clamps to 100.
     expect(result.riskBreakdown.timePressure).toBe(100);
-    expect(result.score).toBe(26);
+    expect(result.score).toBe(29);
   });
 
   it("recovery: few tabs on one task + a breathing tab => recoverySignal > 0 and not red", () => {

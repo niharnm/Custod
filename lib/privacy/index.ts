@@ -117,10 +117,14 @@ export function scanToMarkdown(scan: Scan): string {
   return lines.join("\n");
 }
 
-export function responseToScan(response: AnalyzeBurnoutResponse, deviceId?: string): Scan {
+export function responseToScan(
+  response: AnalyzeBurnoutResponse,
+  owner?: { userId?: string; deviceId?: string }
+): Scan {
   return {
     id: response.scanId,
-    deviceId,
+    deviceId: owner?.deviceId,
+    userId: owner?.userId,
     createdAt: response.createdAt,
     status: response.status,
     score: response.score,

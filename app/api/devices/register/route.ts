@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 import { getScanStore } from "@/lib/storage/scans";
+import { resolveOwner } from "@/lib/owner";
 import { registerDeviceRequestSchema, zodErrorMessage } from "@/lib/validation/schemas";
 import { clientKey, rateLimit } from "@/lib/http-guards";
 
@@ -15,9 +16,10 @@ export async function POST(request: Request) {
         { status: 429, headers: { "Retry-After": String(limited.retryAfter) } }
       );
     }
+    const owner = await resolveOwner(request);
     const body = await request.json().catch(() => ({}));
     const parsed = registerDeviceRequestSchema.parse(body);
-    const device = await getScanStore().registerDevice(parsed);
+    const device = await getScanStore().registerDevice({ ...parsed, userId: owner.userId });
     return NextResponse.json({ device });
   } catch (error) {
     if (error instanceof ZodError) {

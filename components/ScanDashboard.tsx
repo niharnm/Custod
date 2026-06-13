@@ -256,6 +256,22 @@ export function ScanDashboard({ scan, readOnly = false }: { scan: Scan; readOnly
               <Sparkles className="h-4 w-4 text-[hsl(var(--primary))]" />
               <h2 className="text-base font-semibold tracking-tight">Why this status</h2>
             </div>
+            {scan.aiReasoning && scan.aiReasoning.length > 0 && (
+              <div className="rounded-xl border border-[hsl(var(--primary))]/20 bg-[hsl(var(--primary))]/5 p-3.5 space-y-2">
+                <div className="flex items-center gap-1.5 text-xs font-semibold text-[hsl(var(--primary))]">
+                  <Sparkles className="h-3.5 w-3.5" />
+                  AI read on the main drivers
+                </div>
+                <ul className="space-y-1.5">
+                  {scan.aiReasoning.map((reason, i) => (
+                    <li key={i} className="flex items-start gap-2 caption leading-5">
+                      <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-[hsl(var(--primary))]" />
+                      <span>{reason}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
             {topSignals.length === 0 ? (
               <p className="caption leading-6">
                 No single signal stood out. {scan.tabCount} tab{scan.tabCount === 1 ? "" : "s"} across{" "}

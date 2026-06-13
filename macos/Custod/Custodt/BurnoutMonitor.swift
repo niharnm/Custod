@@ -42,6 +42,7 @@ final class BurnoutMonitor: ObservableObject {
     private var loopTask: Task<Void, Never>?
     private weak var history: HistoryStore?
     private var settings: SettingsStore?
+    private var sync: CustodSync?
     private var lastLoggedStatus: BurnoutStatus?
     private var lastInterventionAt: Date?
 
@@ -51,9 +52,10 @@ final class BurnoutMonitor: ObservableObject {
     private var lastReasonedSignature: String?
     private var lastReasoning: (summary: String, reasons: [String])?
 
-    func attach(history: HistoryStore, settings: SettingsStore) {
+    func attach(history: HistoryStore, settings: SettingsStore, auth: AuthStore) {
         self.history = history
         self.settings = settings
+        self.sync = CustodSync(auth: auth)
     }
 
     func start() {
@@ -157,7 +159,12 @@ final class BurnoutMonitor: ObservableObject {
 
         if a.status != lastLoggedStatus {
             lastLoggedStatus = a.status
-            history?.add(BurnoutCheckRecord(rawTabs: imported, mood: mood, analysis: a))
+            let record = BurnoutCheckRecord(rawTabs: imported, mood: mood, analysis: a)
+            history?.add(record)
+            // Mirror the check to the account so it shows up everywhere you're
+            // signed in. Best-effort and non-blocking; no-ops when there are no
+            // tabs to score.
+            Task { [sync] in await sync?.push(record) }
         }
 
         maybeIntervene(a)

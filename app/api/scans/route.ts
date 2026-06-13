@@ -3,6 +3,7 @@ import { ZodError } from "zod";
 import { applyOptionalAiWording } from "@/lib/ai";
 import { analyzeWithRules } from "@/lib/scoring";
 import { getScanStore } from "@/lib/storage/scans";
+import { resolveOwner } from "@/lib/owner";
 import { analyzeBurnoutRequestSchema, zodErrorMessage } from "@/lib/validation/schemas";
 import { clientKey, getIdempotent, rateLimit, setIdempotent } from "@/lib/http-guards";
 import type { AnalyzeBurnoutResponse } from "@/lib/types";
@@ -25,10 +26,11 @@ export async function POST(request: Request) {
       if (cached) return NextResponse.json(cached);
     }
 
+    const owner = await resolveOwner(request);
     const body = await request.json().catch(() => ({}));
     const parsed = analyzeBurnoutRequestSchema.parse({
       ...body,
-      deviceId: body?.deviceId ?? request.headers.get("X-Custod-Device") ?? undefined,
+      deviceId: body?.deviceId ?? owner.deviceId ?? undefined,
     });
 
     if (parsed.tabs.length === 0) {
@@ -37,7 +39,7 @@ export async function POST(request: Request) {
 
     const rules = analyzeWithRules(parsed);
     const analysis = await applyOptionalAiWording(parsed, rules);
-    await getScanStore().createScan(analysis, parsed.deviceId);
+    await getScanStore().createScan(analysis, owner);
 
     if (idempotencyKey) setIdempotent(`scans:${idempotencyKey}`, analysis);
 
@@ -56,7 +58,7 @@ export async function POST(request: Request) {
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const limit = Math.min(100, Math.max(1, Number(url.searchParams.get("limit") ?? 30)));
-  const deviceId = request.headers.get("X-Custod-Device") ?? url.searchParams.get("deviceId") ?? undefined;
-  const scans = await getScanStore().listScans(deviceId, limit);
+  const owner = await resolveOwner(request);
+  const scans = await getScanStore().listScans(owner, limit);
   return NextResponse.json({ scans });
 }

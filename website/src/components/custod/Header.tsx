@@ -3,14 +3,35 @@
 import { Menu, X } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import type { AuthChangeEvent, Session } from "@supabase/supabase-js";
 import { StatusDot } from "@/components/custod/StatusLamp";
 import { NAV_LINKS } from "@/lib/custod-content";
+import { getSupabaseBrowser, isSupabaseConfigured } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 
 export function Header() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [showFloatingCta, setShowFloatingCta] = useState(false);
+  const [signedIn, setSignedIn] = useState(false);
+
+  // The primary CTA sends signed-out visitors to sign in and signed-in users
+  // straight to their dashboard.
+  const ctaHref = signedIn ? "/dashboard" : "/login";
+  const ctaLabel = signedIn ? "Open dashboard" : "Sign in";
+
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+    const supabase = getSupabaseBrowser();
+    supabase.auth
+      .getSession()
+      .then(({ data }: { data: { session: Session | null } }) => setSignedIn(Boolean(data.session)))
+      .catch(() => setSignedIn(false));
+    const { data: sub } = supabase.auth.onAuthStateChange(
+      (_event: AuthChangeEvent, session: Session | null) => setSignedIn(Boolean(session)),
+    );
+    return () => sub.subscription.unsubscribe();
+  }, []);
 
   useEffect(() => {
     const onScroll = () => {
@@ -59,10 +80,10 @@ export function Header() {
 
           <div className="hidden md:block">
             <Link
-              href="mailto:hello@custod.app?subject=Custod%20Waitlist"
+              href={ctaHref}
               className="custod-primary-button rounded-full px-5 py-2.5 text-sm font-semibold transition hover:scale-[1.03] active:scale-[0.97]"
             >
-              Join waitlist
+              {ctaLabel}
             </Link>
           </div>
 
@@ -86,11 +107,11 @@ export function Header() {
         )}
       >
         <Link
-          href="mailto:hello@custod.app?subject=Custod%20Waitlist"
+          href={ctaHref}
           className="custod-primary-button inline-flex items-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold shadow-md"
         >
           <StatusDot status="green" />
-          Join waitlist
+          {ctaLabel}
         </Link>
       </div>
 
@@ -126,11 +147,11 @@ export function Header() {
               ))}
             </nav>
             <Link
-              href="mailto:hello@custod.app?subject=Custod%20Waitlist"
+              href={ctaHref}
               className="custod-primary-button mt-6 block w-full rounded-full px-4 py-3 text-center text-sm font-semibold"
               onClick={() => setMenuOpen(false)}
             >
-              Join waitlist
+              {ctaLabel}
             </Link>
           </div>
         </div>

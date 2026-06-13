@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getScanStore } from "@/lib/storage/scans";
+import { resolveOwner } from "@/lib/owner";
 import { getCheckBySlug } from "@/lib/storage";
 
 export const dynamic = "force-dynamic";
@@ -24,8 +25,8 @@ export async function DELETE(
   { params }: { params: Promise<{ slug: string }> }
 ) {
   const { slug } = await params;
-  const deviceId = request.headers.get("X-Custod-Device") ?? undefined;
-  const revoked = await getScanStore().revokeShare(slug, deviceId);
+  const owner = await resolveOwner(request);
+  const revoked = await getScanStore().revokeShare(slug, owner);
   if (!revoked) return NextResponse.json({ error: "Share link not found." }, { status: 404 });
   return NextResponse.json({ ok: true });
 }

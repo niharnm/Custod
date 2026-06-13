@@ -1,8 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
-  output: "standalone",
+  /* Vercel handles the build output natively; `output: "standalone"` is for
+     self-hosting/Docker and can drop prerendered nested routes on Vercel. */
 };
 
 export default nextConfig;

@@ -11,6 +11,7 @@ import type {
   Scan,
   ScanEvent,
 } from "@/lib/types";
+import type { Owner } from "@/lib/owner";
 import { deriveProgress, unlockedAfterReset } from "@/lib/gamification";
 import {
   DEFAULT_PRIVACY_SETTINGS,
@@ -24,6 +25,7 @@ import { generateId, shareUrl } from "@/lib/utils";
 type ShareRecord = {
   slug: string;
   scanId: string;
+  userId?: string;
   deviceId?: string;
   expiresAt: string;
   includeRawTabs: boolean;
@@ -40,20 +42,22 @@ type DataExport = {
 
 type ScanStore = {
   mode: "supabase" | "memory-dev";
-  registerDevice(input: { deviceId?: string; platform: DevicePlatform; label?: string }): Promise<Device>;
-  createScan(response: AnalyzeBurnoutResponse, deviceId?: string): Promise<Scan>;
-  getScan(id: string, deviceId?: string): Promise<Scan | null>;
-  listScans(deviceId?: string, limit?: number): Promise<Scan[]>;
-  addReflection(scanId: string, input: ReflectionRequest, deviceId?: string): Promise<Reflection | null>;
-  completeReset(scanId: string, completedSteps?: string[], deviceId?: string): Promise<{ resetStreak: ReturnType<typeof deriveProgress>["streaks"][number]; unlocked: Achievement[] } | null>;
-  getEvents(deviceId?: string): Promise<ScanEvent[]>;
-  getPrivacy(deviceId?: string): Promise<PrivacySettings>;
-  updatePrivacy(patch: Partial<PrivacySettings>, deviceId?: string): Promise<PrivacySettings>;
-  createShare(scanId: string, options: { includeRawTabs?: boolean; expiresInHours?: number }, deviceId?: string): Promise<{ slug: string; url: string; expiresAt: string } | null>;
+  registerDevice(input: { deviceId?: string; platform: DevicePlatform; label?: string; userId?: string }): Promise<Device>;
+  createScan(response: AnalyzeBurnoutResponse, owner?: Owner): Promise<Scan>;
+  getScan(id: string, owner?: Owner): Promise<Scan | null>;
+  listScans(owner?: Owner, limit?: number): Promise<Scan[]>;
+  addReflection(scanId: string, input: ReflectionRequest, owner?: Owner): Promise<Reflection | null>;
+  completeReset(scanId: string, completedSteps?: string[], owner?: Owner): Promise<{ resetStreak: ReturnType<typeof deriveProgress>["streaks"][number]; unlocked: Achievement[] } | null>;
+  getEvents(owner?: Owner): Promise<ScanEvent[]>;
+  getPrivacy(owner?: Owner): Promise<PrivacySettings>;
+  updatePrivacy(patch: Partial<PrivacySettings>, owner?: Owner): Promise<PrivacySettings>;
+  createShare(scanId: string, options: { includeRawTabs?: boolean; expiresInHours?: number }, owner?: Owner): Promise<{ slug: string; url: string; expiresAt: string } | null>;
   getSharedScan(slug: string): Promise<Scan | null>;
-  revokeShare(slug: string, deviceId?: string): Promise<boolean>;
-  exportData(deviceId?: string): Promise<DataExport>;
-  deleteData(deviceId?: string): Promise<{ scans: number; reflections: number; shares: number }>;
+  revokeShare(slug: string, owner?: Owner): Promise<boolean>;
+  exportData(owner?: Owner): Promise<DataExport>;
+  deleteData(owner?: Owner): Promise<{ scans: number; reflections: number; shares: number }>;
+  /** Re-parent anonymous device rows to a user after sign-in. */
+  claimDevice(userId: string, deviceId: string): Promise<{ scans: number }>;
 };
 
 let memoryStore: MemoryScanStore | null = null;
@@ -65,6 +69,31 @@ export function getScanStore(): ScanStore {
   return memoryStore;
 }
 
+// ── Owner helpers ───────────────────────────────────────────────────────────
+// Precedence: a signed-in user (userId) scopes by account; otherwise scope by
+// the anonymous deviceId. An empty owner matches everything (used for public
+// shared-scan reads).
+
+function hasOwner(owner?: Owner): boolean {
+  return Boolean(owner?.userId || owner?.deviceId);
+}
+
+function ownerKey(owner?: Owner): string {
+  if (owner?.userId) return `u:${owner.userId}`;
+  if (owner?.deviceId) return `d:${owner.deviceId}`;
+  return "";
+}
+
+function scanOwner(scan: Scan): Owner {
+  return { userId: scan.userId, deviceId: scan.deviceId };
+}
+
+function ownsOwner(scan: Scan, owner?: Owner): boolean {
+  if (!hasOwner(owner)) return true;
+  if (owner?.userId) return scan.userId === owner.userId;
+  return scan.deviceId === owner?.deviceId;
+}
+
 class MemoryScanStore implements ScanStore {
   mode = "memory-dev" as const;
   private devices = new Map<string, Device>();
@@ -74,7 +103,7 @@ class MemoryScanStore implements ScanStore {
   private privacy = new Map<string, PrivacySettings>();
   private shares = new Map<string, ShareRecord>();
 
-  async registerDevice(input: { deviceId?: string; platform: DevicePlatform; label?: string }) {
+  async registerDevice(input: { deviceId?: string; platform: DevicePlatform; label?: string; userId?: string }) {
     const now = new Date().toISOString();
     const id = input.deviceId || generateId();
     const device: Device = {
@@ -83,35 +112,34 @@ class MemoryScanStore implements ScanStore {
       label: input.label,
       createdAt: this.devices.get(id)?.createdAt ?? now,
       lastSeenAt: now,
-      syncEnabled: this.privacy.get(id)?.syncEnabled ?? false,
+      syncEnabled: this.privacy.get(ownerKey({ deviceId: id }))?.syncEnabled ?? false,
     };
     this.devices.set(id, device);
-    this.privacy.set(id, this.privacy.get(id) ?? DEFAULT_PRIVACY_SETTINGS);
     return device;
   }
 
-  async createScan(response: AnalyzeBurnoutResponse, deviceId?: string) {
-    const scan = responseToScan(response, deviceId);
+  async createScan(response: AnalyzeBurnoutResponse, owner?: Owner) {
+    const scan = responseToScan(response, owner);
     this.scans.set(scan.id, scan);
-    this.events.push(event("scan_created", scan.id, deviceId, { score: scan.score, status: scan.status }));
+    this.events.push(event("scan_created", scan.id, owner, { score: scan.score, status: scan.status }));
     return scan;
   }
 
-  async getScan(id: string, deviceId?: string) {
+  async getScan(id: string, owner?: Owner) {
     const scan = this.scans.get(id);
-    if (!scan || !ownsDevice(scan, deviceId)) return null;
+    if (!scan || !ownsOwner(scan, owner)) return null;
     return withReflection(scan, this.reflections.get(id));
   }
 
-  async listScans(deviceId?: string, limit = 30) {
+  async listScans(owner?: Owner, limit = 30) {
     return Array.from(this.scans.values())
-      .filter((scan) => ownsDevice(scan, deviceId))
+      .filter((scan) => ownsOwner(scan, owner))
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
       .slice(0, limit);
   }
 
-  async addReflection(scanId: string, input: ReflectionRequest, deviceId?: string) {
-    const scan = await this.getScan(scanId, deviceId);
+  async addReflection(scanId: string, input: ReflectionRequest, owner?: Owner) {
+    const scan = await this.getScan(scanId, owner);
     if (!scan) return null;
     const reflection: Reflection = {
       scanId,
@@ -121,16 +149,16 @@ class MemoryScanStore implements ScanStore {
       createdAt: new Date().toISOString(),
     };
     this.reflections.set(scanId, reflection);
-    this.events.push(event("reflection_added", scanId, scan.deviceId, { accuracy: input.accuracy ?? null }));
+    this.events.push(event("reflection_added", scanId, scanOwner(scan), { accuracy: input.accuracy ?? null }));
     return reflection;
   }
 
-  async completeReset(scanId: string, completedSteps?: string[], deviceId?: string) {
-    const scan = await this.getScan(scanId, deviceId);
+  async completeReset(scanId: string, completedSteps?: string[], owner?: Owner) {
+    const scan = await this.getScan(scanId, owner);
     if (!scan) return null;
-    this.events.push(event("reset_complete", scanId, scan.deviceId, { completedSteps: completedSteps?.length ?? 0 }));
-    const scans = await this.listScans(scan.deviceId, 500);
-    const events = await this.getEvents(scan.deviceId);
+    this.events.push(event("reset_complete", scanId, scanOwner(scan), { completedSteps: completedSteps?.length ?? 0 }));
+    const scans = await this.listScans(scanOwner(scan), 500);
+    const events = await this.getEvents(scanOwner(scan));
     const progress = deriveProgress(scans, events);
     return {
       resetStreak: progress.streaks.find((streak) => streak.type === "reset") ?? progress.streaks[1],
@@ -138,31 +166,34 @@ class MemoryScanStore implements ScanStore {
     };
   }
 
-  async getEvents(deviceId?: string) {
-    return this.events.filter((item) => !deviceId || item.deviceId === deviceId);
+  async getEvents(owner?: Owner) {
+    if (!hasOwner(owner)) return this.events;
+    return this.events.filter((item) => ownsOwner({ deviceId: item.deviceId, userId: item.userId } as Scan, owner));
   }
 
-  async getPrivacy(deviceId?: string) {
-    if (!deviceId) return DEFAULT_PRIVACY_SETTINGS;
-    const settings = this.privacy.get(deviceId) ?? DEFAULT_PRIVACY_SETTINGS;
-    this.privacy.set(deviceId, settings);
+  async getPrivacy(owner?: Owner) {
+    const key = ownerKey(owner);
+    if (!key) return DEFAULT_PRIVACY_SETTINGS;
+    const settings = this.privacy.get(key) ?? DEFAULT_PRIVACY_SETTINGS;
+    this.privacy.set(key, settings);
     return settings;
   }
 
-  async updatePrivacy(patch: Partial<PrivacySettings>, deviceId?: string) {
-    const current = await this.getPrivacy(deviceId);
+  async updatePrivacy(patch: Partial<PrivacySettings>, owner?: Owner) {
+    const current = await this.getPrivacy(owner);
     const next = { ...current, ...patch };
-    if (deviceId) this.privacy.set(deviceId, next);
+    const key = ownerKey(owner);
+    if (key) this.privacy.set(key, next);
     return next;
   }
 
-  async createShare(scanId: string, options: { includeRawTabs?: boolean; expiresInHours?: number }, deviceId?: string) {
-    const scan = await this.getScan(scanId, deviceId);
+  async createShare(scanId: string, options: { includeRawTabs?: boolean; expiresInHours?: number }, owner?: Owner) {
+    const scan = await this.getScan(scanId, owner);
     if (!scan) return null;
     const slug = generateId().replace(/-/g, "").slice(0, 12);
     const expiresAt = new Date(Date.now() + (options.expiresInHours ?? 72) * 60 * 60 * 1000).toISOString();
-    this.shares.set(slug, { slug, scanId, deviceId: scan.deviceId, expiresAt, includeRawTabs: Boolean(options.includeRawTabs) });
-    this.events.push(event("share_created", scanId, scan.deviceId, { includeRawTabs: Boolean(options.includeRawTabs) }));
+    this.shares.set(slug, { slug, scanId, userId: scan.userId, deviceId: scan.deviceId, expiresAt, includeRawTabs: Boolean(options.includeRawTabs) });
+    this.events.push(event("share_created", scanId, scanOwner(scan), { includeRawTabs: Boolean(options.includeRawTabs) }));
     return { slug, url: shareUrl(slug), expiresAt };
   }
 
@@ -173,27 +204,27 @@ class MemoryScanStore implements ScanStore {
     return scan ? publicScan(scan, share.includeRawTabs) : null;
   }
 
-  async revokeShare(slug: string, deviceId?: string) {
+  async revokeShare(slug: string, owner?: Owner) {
     const share = this.shares.get(slug);
     if (!share) return false;
-    if (deviceId && share.deviceId && share.deviceId !== deviceId) return false;
+    if (hasOwner(owner) && !ownsOwner({ userId: share.userId, deviceId: share.deviceId } as Scan, owner)) return false;
     this.shares.set(slug, { ...share, revokedAt: new Date().toISOString() });
     return true;
   }
 
-  async exportData(deviceId?: string) {
+  async exportData(owner?: Owner) {
     return {
       storage: this.mode,
       exportedAt: new Date().toISOString(),
-      privacy: await this.getPrivacy(deviceId),
-      scans: await this.listScans(deviceId, 1000),
-      events: await this.getEvents(deviceId),
+      privacy: await this.getPrivacy(owner),
+      scans: await this.listScans(owner, 1000),
+      events: await this.getEvents(owner),
     };
   }
 
-  async deleteData(deviceId?: string) {
+  async deleteData(owner?: Owner) {
     const scanIds = Array.from(this.scans.values())
-      .filter((scan) => ownsDevice(scan, deviceId))
+      .filter((scan) => ownsOwner(scan, owner))
       .map((scan) => scan.id);
     for (const id of scanIds) {
       this.scans.delete(id);
@@ -209,6 +240,27 @@ class MemoryScanStore implements ScanStore {
     this.events = this.events.filter((item) => !scanIds.includes(item.scanId ?? ""));
     return { scans: scanIds.length, reflections: scanIds.length, shares };
   }
+
+  async claimDevice(userId: string, deviceId: string) {
+    let claimed = 0;
+    for (const [id, scan] of this.scans) {
+      if (scan.deviceId === deviceId && !scan.userId) {
+        this.scans.set(id, { ...scan, userId });
+        claimed += 1;
+      }
+    }
+    for (let i = 0; i < this.events.length; i += 1) {
+      const ev = this.events[i];
+      if (ev.deviceId === deviceId && !ev.userId) this.events[i] = { ...ev, userId };
+    }
+    for (const [slug, share] of this.shares) {
+      if (share.deviceId === deviceId && !share.userId) this.shares.set(slug, { ...share, userId });
+    }
+    const deviceKey = ownerKey({ deviceId });
+    const settings = this.privacy.get(deviceKey);
+    if (settings) this.privacy.set(ownerKey({ userId }), settings);
+    return { scans: claimed };
+  }
 }
 
 type SupabaseLike = {
@@ -222,25 +274,34 @@ type DbBuilder = PromiseLike<QueryResult> & {
   update(values: unknown): DbBuilder;
   delete(): DbBuilder;
   eq(column: string, value: unknown): DbBuilder;
+  is(column: string, value: unknown): DbBuilder;
   in(column: string, values: unknown[]): DbBuilder;
   order(column: string, options?: { ascending?: boolean }): DbBuilder;
   limit(count: number): DbBuilder;
   maybeSingle(): DbBuilder;
 };
 
+/** Apply owner scoping to a query: user_id when signed in, else device_id. */
+function ownerEq(builder: DbBuilder, owner?: Owner): DbBuilder {
+  if (owner?.userId) return builder.eq("user_id", owner.userId);
+  if (owner?.deviceId) return builder.eq("device_id", owner.deviceId);
+  return builder;
+}
+
 class SupabaseScanStore implements ScanStore {
   mode = "supabase" as const;
   constructor(private supabase: SupabaseLike) {}
 
-  async registerDevice(input: { deviceId?: string; platform: DevicePlatform; label?: string }) {
+  async registerDevice(input: { deviceId?: string; platform: DevicePlatform; label?: string; userId?: string }) {
     const now = new Date().toISOString();
     const id = input.deviceId || generateId();
     const row = {
       id,
+      user_id: input.userId ?? null,
       platform: input.platform,
       label: input.label ?? null,
       last_seen_at: now,
-      sync_enabled: false,
+      sync_enabled: Boolean(input.userId),
     };
     const { data, error } = await query(
       this.supabase.from("devices").upsert(row).select("*").maybeSingle()
@@ -249,13 +310,14 @@ class SupabaseScanStore implements ScanStore {
     return rowToDevice(data ?? { ...row, created_at: now });
   }
 
-  async createScan(response: AnalyzeBurnoutResponse, deviceId?: string) {
-    const scan = responseToScan(response, deviceId);
+  async createScan(response: AnalyzeBurnoutResponse, owner?: Owner) {
+    const scan = responseToScan(response, owner);
     const aggregate = aggregateTabs(response.tabGroups.flatMap((group) => group.tabs));
     const { error } = await query(
       this.supabase.from("scans").insert({
         id: scan.id,
-        device_id: deviceId ?? null,
+        user_id: owner?.userId ?? null,
+        device_id: owner?.deviceId ?? null,
         created_at: scan.createdAt,
         status: scan.status,
         status_label: scan.statusLabel,
@@ -283,30 +345,31 @@ class SupabaseScanStore implements ScanStore {
           ignore_for_now: scan.resetPlan?.ignoreForNow ?? [],
         })
       ),
-      this.insertEvent("scan_created", scan.id, deviceId, { score: scan.score, status: scan.status }),
+      this.insertEvent("scan_created", scan.id, owner, { score: scan.score, status: scan.status }),
     ]);
     return scan;
   }
 
-  async getScan(id: string, deviceId?: string) {
-    let builder = this.supabase.from("scans").select("*").eq("id", id);
-    if (deviceId) builder = builder.eq("device_id", deviceId);
+  async getScan(id: string, owner?: Owner) {
+    const builder = ownerEq(this.supabase.from("scans").select("*").eq("id", id), owner);
     const { data, error } = await query(builder.maybeSingle());
     if (error) throw new Error(error.message);
     return data ? rowToScan(data) : null;
   }
 
-  async listScans(deviceId?: string, limit = 30) {
-    let builder = this.supabase.from("scans").select("*").order("created_at", { ascending: false }).limit(limit);
-    if (deviceId) builder = builder.eq("device_id", deviceId);
+  async listScans(owner?: Owner, limit = 30) {
+    const builder = ownerEq(
+      this.supabase.from("scans").select("*").order("created_at", { ascending: false }).limit(limit),
+      owner
+    );
     const { data, error } = await query(builder);
     if (error) throw new Error(error.message);
     const rows = (data ?? []) as DbRow[];
     return rows.map((row) => rowToScan(row));
   }
 
-  async addReflection(scanId: string, input: ReflectionRequest, deviceId?: string) {
-    const scan = await this.getScan(scanId, deviceId);
+  async addReflection(scanId: string, input: ReflectionRequest, owner?: Owner) {
+    const scan = await this.getScan(scanId, owner);
     if (!scan) return null;
     const reflection: Reflection = {
       scanId,
@@ -318,22 +381,23 @@ class SupabaseScanStore implements ScanStore {
     const { error } = await query(
       this.supabase.from("reflections").insert({
         scan_id: scanId,
+        user_id: scan.userId ?? null,
         text: reflection.text,
         metadata: { accuracy: input.accuracy ?? null, helpfulAction: input.helpfulAction ?? null },
         created_at: reflection.createdAt,
       })
     );
     if (error) throw new Error(error.message);
-    await this.insertEvent("reflection_added", scanId, scan.deviceId, { accuracy: input.accuracy ?? null });
+    await this.insertEvent("reflection_added", scanId, scanOwner(scan), { accuracy: input.accuracy ?? null });
     return reflection;
   }
 
-  async completeReset(scanId: string, completedSteps?: string[], deviceId?: string) {
-    const scan = await this.getScan(scanId, deviceId);
+  async completeReset(scanId: string, completedSteps?: string[], owner?: Owner) {
+    const scan = await this.getScan(scanId, owner);
     if (!scan) return null;
-    await this.insertEvent("reset_complete", scanId, scan.deviceId, { completedSteps: completedSteps?.length ?? 0 });
-    const scans = await this.listScans(scan.deviceId, 500);
-    const events = await this.getEvents(scan.deviceId);
+    await this.insertEvent("reset_complete", scanId, scanOwner(scan), { completedSteps: completedSteps?.length ?? 0 });
+    const scans = await this.listScans(scanOwner(scan), 500);
+    const events = await this.getEvents(scanOwner(scan));
     const progress = deriveProgress(scans, events);
     return {
       resetStreak: progress.streaks.find((streak) => streak.type === "reset") ?? progress.streaks[1],
@@ -341,34 +405,33 @@ class SupabaseScanStore implements ScanStore {
     };
   }
 
-  async getEvents(deviceId?: string) {
-    let builder = this.supabase.from("scan_events").select("*").order("created_at", { ascending: false });
-    if (deviceId) builder = builder.eq("device_id", deviceId);
+  async getEvents(owner?: Owner) {
+    const builder = ownerEq(this.supabase.from("scan_events").select("*").order("created_at", { ascending: false }), owner);
     const { data, error } = await query(builder);
     if (error) throw new Error(error.message);
     const rows = (data ?? []) as DbRow[];
     return rows.map((row) => rowToEvent(row));
   }
 
-  async getPrivacy(deviceId?: string) {
-    if (!deviceId) return DEFAULT_PRIVACY_SETTINGS;
+  async getPrivacy(owner?: Owner) {
+    if (!hasOwner(owner)) return DEFAULT_PRIVACY_SETTINGS;
     const { data, error } = await query(
-      this.supabase.from("privacy_settings").select("*").eq("device_id", deviceId).maybeSingle()
+      ownerEq(this.supabase.from("privacy_settings").select("*"), owner).maybeSingle()
     );
     if (error) throw new Error(error.message);
     return data ? rowToPrivacy(data) : DEFAULT_PRIVACY_SETTINGS;
   }
 
-  async updatePrivacy(patch: Partial<PrivacySettings>, deviceId?: string) {
-    if (!deviceId) return { ...DEFAULT_PRIVACY_SETTINGS, ...patch };
-    const row = privacyToRow({ ...(await this.getPrivacy(deviceId)), ...patch }, deviceId);
+  async updatePrivacy(patch: Partial<PrivacySettings>, owner?: Owner) {
+    if (!hasOwner(owner)) return { ...DEFAULT_PRIVACY_SETTINGS, ...patch };
+    const row = privacyToRow({ ...(await this.getPrivacy(owner)), ...patch }, owner);
     const { data, error } = await query(this.supabase.from("privacy_settings").upsert(row).select("*").maybeSingle());
     if (error) throw new Error(error.message);
     return rowToPrivacy(data ?? row);
   }
 
-  async createShare(scanId: string, options: { includeRawTabs?: boolean; expiresInHours?: number }, deviceId?: string) {
-    const scan = await this.getScan(scanId, deviceId);
+  async createShare(scanId: string, options: { includeRawTabs?: boolean; expiresInHours?: number }, owner?: Owner) {
+    const scan = await this.getScan(scanId, owner);
     if (!scan) return null;
     const slug = generateId().replace(/-/g, "").slice(0, 12);
     const expiresAt = new Date(Date.now() + (options.expiresInHours ?? 72) * 60 * 60 * 1000).toISOString();
@@ -376,13 +439,14 @@ class SupabaseScanStore implements ScanStore {
       this.supabase.from("share_links").insert({
         slug,
         scan_id: scanId,
+        user_id: scan.userId ?? null,
         device_id: scan.deviceId ?? null,
         expires_at: expiresAt,
         include_raw_tabs: Boolean(options.includeRawTabs),
       })
     );
     if (error) throw new Error(error.message);
-    await this.insertEvent("share_created", scanId, scan.deviceId, { includeRawTabs: Boolean(options.includeRawTabs) });
+    await this.insertEvent("share_created", scanId, scanOwner(scan), { includeRawTabs: Boolean(options.includeRawTabs) });
     return { slug, url: shareUrl(slug), expiresAt };
   }
 
@@ -394,26 +458,25 @@ class SupabaseScanStore implements ScanStore {
     return scan ? publicScan(scan, Boolean(data.include_raw_tabs)) : null;
   }
 
-  async revokeShare(slug: string, deviceId?: string) {
-    let builder = this.supabase.from("share_links").update({ revoked_at: new Date().toISOString() }).eq("slug", slug);
-    if (deviceId) builder = builder.eq("device_id", deviceId);
+  async revokeShare(slug: string, owner?: Owner) {
+    const builder = ownerEq(this.supabase.from("share_links").update({ revoked_at: new Date().toISOString() }).eq("slug", slug), owner);
     const { error } = await query(builder);
     if (error) throw new Error(error.message);
     return true;
   }
 
-  async exportData(deviceId?: string) {
+  async exportData(owner?: Owner) {
     return {
       storage: this.mode,
       exportedAt: new Date().toISOString(),
-      privacy: await this.getPrivacy(deviceId),
-      scans: await this.listScans(deviceId, 1000),
-      events: await this.getEvents(deviceId),
+      privacy: await this.getPrivacy(owner),
+      scans: await this.listScans(owner, 1000),
+      events: await this.getEvents(owner),
     };
   }
 
-  async deleteData(deviceId?: string) {
-    const scans = await this.listScans(deviceId, 1000);
+  async deleteData(owner?: Owner) {
+    const scans = await this.listScans(owner, 1000);
     const ids = scans.map((scan) => scan.id);
     if (ids.length) {
       await query(this.supabase.from("share_links").delete().in("scan_id", ids));
@@ -423,11 +486,30 @@ class SupabaseScanStore implements ScanStore {
     return { scans: ids.length, reflections: ids.length, shares: 0 };
   }
 
-  private async insertEvent(type: ScanEvent["type"], scanId: string, deviceId: string | undefined, metadata: Record<string, unknown>) {
+  async claimDevice(userId: string, deviceId: string) {
+    // Re-parent the device's anonymous rows to the user (only rows not yet owned).
+    const tables = ["scans", "scan_events", "share_links", "reflections", "privacy_settings", "devices"];
+    let scans = 0;
+    for (const table of tables) {
+      const builder = this.supabase
+        .from(table)
+        .update({ user_id: userId })
+        .eq("device_id", deviceId)
+        .is("user_id", null)
+        .select("id");
+      const { data, error } = await query(builder);
+      if (error) continue; // table may lack device_id/user_id in some envs; skip
+      if (table === "scans") scans = (data as DbRow[] | null)?.length ?? 0;
+    }
+    return { scans };
+  }
+
+  private async insertEvent(type: ScanEvent["type"], scanId: string, owner: Owner | undefined, metadata: Record<string, unknown>) {
     const { error } = await query(
       this.supabase.from("scan_events").insert({
         scan_id: scanId,
-        device_id: deviceId ?? null,
+        user_id: owner?.userId ?? null,
+        device_id: owner?.deviceId ?? null,
         event_type: type,
         metadata,
       })
@@ -436,12 +518,8 @@ class SupabaseScanStore implements ScanStore {
   }
 }
 
-function event(type: ScanEvent["type"], scanId: string, deviceId: string | undefined, metadata: Record<string, unknown>): ScanEvent {
-  return { id: generateId(), scanId, deviceId, type, metadata, createdAt: new Date().toISOString() };
-}
-
-function ownsDevice(scan: Scan, deviceId?: string): boolean {
-  return !deviceId || scan.deviceId === deviceId;
+function event(type: ScanEvent["type"], scanId: string, owner: Owner | undefined, metadata: Record<string, unknown>): ScanEvent {
+  return { id: generateId(), scanId, deviceId: owner?.deviceId, userId: owner?.userId, type, metadata, createdAt: new Date().toISOString() };
 }
 
 function withReflection(scan: Scan, reflection?: Reflection): Scan {
@@ -460,7 +538,7 @@ function rowToDevice(row: DbRow): Device {
 }
 
 function rowToScan(row: DbRow): Scan {
-  if (row.analysis) return responseToScan(row.analysis, row.device_id ?? undefined);
+  if (row.analysis) return responseToScan(row.analysis, { userId: row.user_id ?? undefined, deviceId: row.device_id ?? undefined });
   return {
     id: row.id,
     deviceId: row.device_id ?? undefined,
@@ -491,6 +569,7 @@ function rowToEvent(row: DbRow): ScanEvent {
     id: row.id,
     scanId: row.scan_id ?? undefined,
     deviceId: row.device_id ?? undefined,
+    userId: row.user_id ?? undefined,
     type: row.event_type,
     metadata: row.metadata ?? {},
     createdAt: row.created_at,
@@ -506,9 +585,10 @@ function rowToPrivacy(row: DbRow): PrivacySettings {
   };
 }
 
-function privacyToRow(settings: PrivacySettings, deviceId: string) {
+function privacyToRow(settings: PrivacySettings, owner?: Owner) {
   return {
-    device_id: deviceId,
+    user_id: owner?.userId ?? null,
+    device_id: owner?.deviceId ?? null,
     store_raw_tabs: settings.storeRawTabs,
     retention_days: settings.retentionDays,
     sync_enabled: settings.syncEnabled,

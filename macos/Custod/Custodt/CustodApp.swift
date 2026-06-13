@@ -11,6 +11,7 @@ struct CustodApp: App {
     @StateObject private var history = HistoryStore()
     @StateObject private var settings = SettingsStore()
     @StateObject private var monitor = BurnoutMonitor()
+    @StateObject private var auth = AuthStore()
 
     var body: some Scene {
         WindowGroup(id: "main") {
@@ -18,9 +19,10 @@ struct CustodApp: App {
                 .environmentObject(history)
                 .environmentObject(settings)
                 .environmentObject(monitor)
+                .environmentObject(auth)
                 .frame(minWidth: 900, idealWidth: 1040, minHeight: 640, idealHeight: 800)
                 .task {
-                    monitor.attach(history: history, settings: settings)
+                    monitor.attach(history: history, settings: settings, auth: auth)
                     monitor.start()
                 }
                 // On first launch, explain why each permission is needed *before*

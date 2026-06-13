@@ -14,7 +14,21 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { getSupabaseBrowser, isSupabaseConfigured } from "@/lib/supabase";
+import { apiFetch } from "@/lib/device";
+import type { Scan } from "@/lib/types";
 import { LINKS } from "@/lib/custod-links";
+
+const STATUS_STYLE: Record<string, { dot: string; label: string }> = {
+  green: { dot: "bg-custod-status-green", label: "Stable" },
+  yellow: { dot: "bg-amber-400", label: "Strained" },
+  red: { dot: "bg-red-500", label: "At Risk" },
+};
+
+function formatWhen(iso: string): string {
+  const d = new Date(iso);
+  return d.toLocaleDateString(undefined, { month: "short", day: "numeric" }) +
+    " · " + d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+}
 
 const SIGNALS = [
   { label: "Tab overload", hint: "How many open loops you're carrying" },
@@ -35,21 +49,46 @@ const NAV = [
 export default function DashboardPage() {
   const router = useRouter();
   const [email, setEmail] = useState<string | null>(null);
+  const [scans, setScans] = useState<Scan[]>([]);
+  const [streak, setStreak] = useState(0);
   // When auth isn't configured, show the preview shell immediately.
   const [ready, setReady] = useState(!isSupabaseConfigured);
 
   useEffect(() => {
+    if (!isSupabaseConfigured) return;
     const supabase = getSupabaseBrowser();
-    if (!supabase) return;
-    supabase.auth.getSession().then(({ data }) => {
+    let active = true;
+    supabase.auth.getSession().then(async ({ data }: { data: { session: { user: { email?: string } } | null } }) => {
       if (!data.session) {
         router.replace("/login");
         return;
       }
+      if (!active) return;
       setEmail(data.session.user.email ?? null);
       setReady(true);
+      // Load this account's real history (cookie session scopes it to the user).
+      try {
+        const [scansRes, progRes] = await Promise.all([
+          apiFetch("/api/scans?limit=8"),
+          apiFetch("/api/me/progress"),
+        ]);
+        const scansJson = await scansRes.json().catch(() => ({ scans: [] }));
+        const progJson = await progRes.json().catch(() => ({}));
+        if (!active) return;
+        if (Array.isArray(scansJson.scans)) setScans(scansJson.scans as Scan[]);
+        const checkinStreak = progJson?.streaks?.find?.((s: { type?: string; current?: number }) => s.type === "checkin");
+        if (checkinStreak?.current) setStreak(Number(checkinStreak.current));
+      } catch {
+        // history is best-effort; the shell still renders
+      }
     });
+    return () => {
+      active = false;
+    };
   }, [router]);
+
+  const latest = scans[0];
+  const latestStyle = latest ? STATUS_STYLE[latest.status] : null;
 
   async function signOut() {
     const supabase = getSupabaseBrowser();
@@ -126,12 +165,14 @@ export default function DashboardPage() {
                 <Gauge className="size-4" /> Current status
               </div>
               <div className="mt-4 flex items-center gap-4">
-                <span className="grid size-16 place-items-center rounded-2xl bg-custod-status-green/10 text-2xl font-bold custod-status-green">
-                  —
+                <span className={`grid size-16 place-items-center rounded-2xl text-2xl font-bold text-white ${latestStyle ? latestStyle.dot : "bg-[#e2e8f0]"}`}>
+                  {latest ? latest.score : "—"}
                 </span>
                 <div>
-                  <p className="text-lg font-semibold">No check yet</p>
-                  <p className="text-sm text-custod-muted">Run your first check to see a status.</p>
+                  <p className="text-lg font-semibold">{latest ? (latest.statusLabel ?? latestStyle?.label) : "No check yet"}</p>
+                  <p className="text-sm text-custod-muted">
+                    {latest ? latest.mainPattern : "Run your first check to see a status."}
+                  </p>
                 </div>
               </div>
             </div>
@@ -140,8 +181,10 @@ export default function DashboardPage() {
               <div className="flex items-center gap-2 text-sm font-medium text-custod-muted">
                 <Flame className="size-4" /> Check-in streak
               </div>
-              <p className="mt-4 text-4xl font-bold">0</p>
-              <p className="mt-1 text-sm text-custod-muted">days in a row — start today</p>
+              <p className="mt-4 text-4xl font-bold">{streak}</p>
+              <p className="mt-1 text-sm text-custod-muted">
+                {streak > 0 ? "days in a row — keep it up" : "days in a row — start today"}
+              </p>
             </div>
 
             <div className="rounded-3xl border border-[#e2e8f0] bg-white p-6">
@@ -174,22 +217,43 @@ export default function DashboardPage() {
           {/* Recent checks */}
           <section className="mt-6 rounded-3xl border border-[#e2e8f0] bg-white p-6">
             <h2 className="text-lg font-semibold">Recent checks</h2>
-            <div className="mt-5 flex flex-col items-center justify-center rounded-2xl border border-dashed border-[#e2e8f0] py-12 text-center">
-              <span className="mb-3 grid size-10 place-items-center rounded-full bg-[#f6f8f7]">
-                <Puzzle className="size-5 text-custod-muted" />
-              </span>
-              <p className="text-sm font-medium">No checks yet</p>
-              <p className="mt-1 max-w-sm text-sm text-custod-muted">
-                Add the Chrome extension and run a check during a messy work session. Your
-                history and trend will build here.
-              </p>
-              <Link
-                href={LINKS.chromeExtension}
-                className="mt-4 inline-flex items-center gap-2 text-sm font-medium text-custod-primary hover:underline"
-              >
-                <Puzzle className="size-4" /> Add to Chrome
-              </Link>
-            </div>
+            {scans.length > 0 ? (
+              <ul className="mt-5 divide-y divide-[#e2e8f0]">
+                {scans.map((scan) => {
+                  const style = STATUS_STYLE[scan.status];
+                  return (
+                    <li key={scan.id} className="flex items-center gap-4 py-3">
+                      <span className={`size-3 shrink-0 rounded-full ${style?.dot ?? "bg-[#e2e8f0]"}`} />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium">{scan.mainPattern || "Browser check"}</p>
+                        <p className="text-xs text-custod-muted">{formatWhen(scan.createdAt)}</p>
+                      </div>
+                      <span className="shrink-0 text-sm font-semibold tabular-nums">{scan.score}</span>
+                      <span className="shrink-0 text-xs font-medium text-custod-muted">
+                        {scan.statusLabel ?? style?.label}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : (
+              <div className="mt-5 flex flex-col items-center justify-center rounded-2xl border border-dashed border-[#e2e8f0] py-12 text-center">
+                <span className="mb-3 grid size-10 place-items-center rounded-full bg-[#f6f8f7]">
+                  <Puzzle className="size-5 text-custod-muted" />
+                </span>
+                <p className="text-sm font-medium">No checks yet</p>
+                <p className="mt-1 max-w-sm text-sm text-custod-muted">
+                  Add the Chrome extension and run a check during a messy work session. Your
+                  history and trend will build here.
+                </p>
+                <Link
+                  href={LINKS.chromeExtension}
+                  className="mt-4 inline-flex items-center gap-2 text-sm font-medium text-custod-primary hover:underline"
+                >
+                  <Puzzle className="size-4" /> Add to Chrome
+                </Link>
+              </div>
+            )}
           </section>
         </main>
       </div>

@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 import { getScanStore } from "@/lib/storage/scans";
+import { resolveOwner } from "@/lib/owner";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
-  const url = new URL(request.url);
-  const deviceId = request.headers.get("X-Custod-Device") ?? url.searchParams.get("deviceId") ?? undefined;
-  const scans = await getScanStore().listScans(deviceId, 500);
+  const owner = await resolveOwner(request);
+  const scans = await getScanStore().listScans(owner, 500);
   const points = scans
     .slice()
     .reverse()

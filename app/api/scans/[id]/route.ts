@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { scanToMarkdown } from "@/lib/privacy";
 import { getScanStore } from "@/lib/storage/scans";
+import { resolveOwner } from "@/lib/owner";
 
 export const dynamic = "force-dynamic";
 
@@ -10,8 +11,8 @@ export async function GET(
 ) {
   const { id } = await params;
   const url = new URL(request.url);
-  const deviceId = request.headers.get("X-Custod-Device") ?? url.searchParams.get("deviceId") ?? undefined;
-  const scan = await getScanStore().getScan(id, deviceId);
+  const owner = await resolveOwner(request);
+  const scan = await getScanStore().getScan(id, owner);
   if (!scan) return NextResponse.json({ error: "Scan not found." }, { status: 404 });
 
   const format = url.searchParams.get("format");

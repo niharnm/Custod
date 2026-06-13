@@ -151,6 +151,7 @@ NEXT_PUBLIC_APP_URL=https://your-custod-deploy.vercel.app
 | `GET`/`PATCH` | `/api/me/privacy` | Read or update device privacy settings. |
 | `POST` | `/api/share` | Create an expiring public scan summary link. |
 | `GET` | `/api/share/[slug]` | Return a public shared scan summary, or a legacy shared check. |
+| `DELETE` | `/api/share/[slug]` | Revoke a share link so it stops resolving. |
 | `GET` | `/api/export` | Export device data as JSON or Markdown. |
 | `DELETE` | `/api/me/data` | Delete device-owned scan data with `{ "confirm": true }`. |
 | `POST` | `/api/analyze` | Analyze submitted tabs and create a burnout check. |

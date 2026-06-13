@@ -34,6 +34,26 @@ export async function apiFetch(input: string, init: RequestInit = {}): Promise<R
   return fetch(input, { ...init, headers });
 }
 
+/**
+ * After signing in, hand the current anonymous device id to the server so any
+ * pre-login scans get re-parented to the new account. Same-origin fetch carries
+ * the session cookie, so the server knows which user is claiming. Best-effort.
+ */
+export async function claimAnonymousHistory(): Promise<void> {
+  if (typeof window === "undefined") return;
+  const id = getDeviceId();
+  if (!id) return;
+  try {
+    await fetch("/api/me/claim", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ deviceId: id }),
+    });
+  } catch {
+    // Non-fatal: history claim can be retried on the next sign-in.
+  }
+}
+
 /** Register the device once per session so server-side rows can be scoped to it. */
 export async function ensureDeviceRegistered(): Promise<void> {
   if (registered || typeof window === "undefined") return;

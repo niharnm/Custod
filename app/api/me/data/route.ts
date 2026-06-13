@@ -1,15 +1,16 @@
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 import { getScanStore } from "@/lib/storage/scans";
+import { resolveOwner } from "@/lib/owner";
 import { deleteDataRequestSchema, zodErrorMessage } from "@/lib/validation/schemas";
 
 export const dynamic = "force-dynamic";
 
 export async function DELETE(request: Request) {
   try {
-    const deviceId = request.headers.get("X-Custod-Device") ?? new URL(request.url).searchParams.get("deviceId") ?? undefined;
+    const owner = await resolveOwner(request);
     deleteDataRequestSchema.parse(await request.json().catch(() => ({})));
-    const deleted = await getScanStore().deleteData(deviceId);
+    const deleted = await getScanStore().deleteData(owner);
     return NextResponse.json({ deleted });
   } catch (error) {
     if (error instanceof ZodError) {
