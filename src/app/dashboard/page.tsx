@@ -3,24 +3,39 @@
 import {
   Flame,
   Gauge,
+  Globe,
   LayoutDashboard,
   LogOut,
+  Monitor,
   Puzzle,
   Settings,
   ShieldCheck,
+  Smartphone,
   TrendingUp,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { getSupabaseBrowser, isSupabaseConfigured } from "@/lib/supabase";
-import { apiFetch } from "@/lib/device";
-import type { Scan } from "@/lib/types";
+import { apiFetch, ensureDeviceRegistered } from "@/lib/device";
+import type { Device, Scan } from "@/lib/types";
 import { LINKS } from "@/lib/custod-links";
 import { TrendView } from "@/components/dashboard/TrendView";
 import { SettingsView } from "@/components/dashboard/SettingsView";
 
 type View = "overview" | "trend" | "settings";
+
+const PLATFORM_ICON: Record<string, React.ComponentType<{ className?: string }>> = {
+  chrome: Puzzle,
+  macos: Monitor,
+  ios: Smartphone,
+  web: Globe,
+};
+
+function deviceLabel(d: Device): string {
+  if (d.label) return d.label;
+  return { chrome: "Chrome extension", macos: "Mac app", ios: "iPhone app", web: "Web" }[d.platform] ?? "Device";
+}
 
 const STATUS_STYLE: Record<string, { dot: string; label: string }> = {
   green: { dot: "bg-custod-status-green", label: "Stable" },
@@ -55,9 +70,12 @@ export default function DashboardPage() {
   const [scans, setScans] = useState<Scan[]>([]);
   const [streak, setStreak] = useState(0);
   const [view, setView] = useState<View>("overview");
+  const [devices, setDevices] = useState<Device[]>([]);
+  const [selectedDevice, setSelectedDevice] = useState<string | null>(null); // null = all devices combined
   // When auth isn't configured, show the preview shell immediately.
   const [ready, setReady] = useState(!isSupabaseConfigured);
 
+  // Auth gate + register this browser as a device + load devices/streak.
   useEffect(() => {
     if (!isSupabaseConfigured) return;
     const supabase = getSupabaseBrowser();
@@ -70,19 +88,20 @@ export default function DashboardPage() {
       if (!active) return;
       setEmail(data.session.user.email ?? null);
       setReady(true);
+      void ensureDeviceRegistered(); // this browser shows up as a connected device
       try {
-        const [scansRes, progRes] = await Promise.all([
-          apiFetch("/api/scans?limit=8"),
+        const [devRes, progRes] = await Promise.all([
+          apiFetch("/api/devices"),
           apiFetch("/api/me/progress"),
         ]);
-        const scansJson = await scansRes.json().catch(() => ({ scans: [] }));
+        const devJson = await devRes.json().catch(() => ({ devices: [] }));
         const progJson = await progRes.json().catch(() => ({}));
         if (!active) return;
-        if (Array.isArray(scansJson.scans)) setScans(scansJson.scans as Scan[]);
+        if (Array.isArray(devJson.devices)) setDevices(devJson.devices as Device[]);
         const checkinStreak = progJson?.streaks?.find?.((s: { type?: string; current?: number }) => s.type === "checkin");
         if (checkinStreak?.current) setStreak(Number(checkinStreak.current));
       } catch {
-        // history is best-effort; the shell still renders
+        // best-effort
       }
     });
     return () => {
@@ -90,6 +109,25 @@ export default function DashboardPage() {
     };
   }, [router]);
 
+  // Load scans for the chosen scope: all devices (combined) or one device.
+  useEffect(() => {
+    if (!ready || !isSupabaseConfigured) return;
+    let active = true;
+    const q = selectedDevice
+      ? `/api/scans?limit=20&device=${encodeURIComponent(selectedDevice)}`
+      : "/api/scans?limit=20";
+    apiFetch(q)
+      .then((r) => r.json())
+      .then((j) => {
+        if (active && Array.isArray(j.scans)) setScans(j.scans as Scan[]);
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, [ready, selectedDevice]);
+
+  const deviceById = new Map(devices.map((d) => [d.id, d]));
   const latest = scans[0];
   const latestStyle = latest ? STATUS_STYLE[latest.status] : null;
 
@@ -168,14 +206,39 @@ export default function DashboardPage() {
                 Here&apos;s your strain at a glance.
               </p>
             </div>
-            <Link
-              href={LINKS.chromeExtension}
-              className="custod-primary-button inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium text-white"
-            >
-              <Puzzle className="size-4" />
-              Run a new check
-            </Link>
+            <div className="flex items-center gap-3">
+              {/* All devices vs one device — your whole account synced in one place. */}
+              <div className="relative inline-flex items-center rounded-xl border border-[#e2e8f0] bg-white pl-3 pr-2 text-sm">
+                <Globe className="size-4 text-custod-muted" />
+                <select
+                  value={selectedDevice ?? ""}
+                  onChange={(e) => setSelectedDevice(e.target.value || null)}
+                  className="cursor-pointer appearance-none bg-transparent py-2.5 pl-2 pr-6 font-medium outline-none"
+                  aria-label="Filter by device"
+                >
+                  <option value="">All devices</option>
+                  {devices.map((d) => (
+                    <option key={d.id} value={d.id}>{deviceLabel(d)}</option>
+                  ))}
+                </select>
+              </div>
+              <Link
+                href={LINKS.chromeExtension}
+                className="custod-primary-button inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium text-white"
+              >
+                <Puzzle className="size-4" />
+                Run a new check
+              </Link>
+            </div>
           </header>
+
+          {devices.length > 0 ? (
+            <p className="mt-3 text-xs text-custod-muted">
+              {selectedDevice
+                ? `Showing checks from ${deviceLabel(deviceById.get(selectedDevice) ?? ({ platform: "web" } as Device))} only.`
+                : `Combined view across ${devices.length} connected ${devices.length === 1 ? "device" : "devices"}.`}
+            </p>
+          ) : null}
 
           {/* Top cards */}
           <section className="mt-8 grid gap-4 lg:grid-cols-3">
@@ -260,13 +323,24 @@ export default function DashboardPage() {
               <ul className="mt-5 divide-y divide-[#e2e8f0]">
                 {scans.map((scan) => {
                   const style = STATUS_STYLE[scan.status];
+                  const dev = scan.deviceId ? deviceById.get(scan.deviceId) : undefined;
+                  const DevIcon = dev ? PLATFORM_ICON[dev.platform] ?? Globe : null;
                   return (
                     <li key={scan.id}>
                       <Link href={`/scan/${scan.id}`} className="-mx-2 flex items-center gap-4 rounded-xl px-2 py-3 transition hover:bg-[#f6f8f7]">
                         <span className={`size-3 shrink-0 rounded-full ${style?.dot ?? "bg-[#e2e8f0]"}`} />
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-sm font-medium">{scan.mainPattern || "Browser check"}</p>
-                          <p className="text-xs text-custod-muted">{formatWhen(scan.createdAt)}</p>
+                          <p className="flex items-center gap-1.5 text-xs text-custod-muted">
+                            {formatWhen(scan.createdAt)}
+                            {!selectedDevice && dev && DevIcon ? (
+                              <>
+                                <span aria-hidden>·</span>
+                                <DevIcon className="size-3" />
+                                {deviceLabel(dev)}
+                              </>
+                            ) : null}
+                          </p>
                         </div>
                         <span className="shrink-0 text-sm font-semibold tabular-nums">{scan.score}</span>
                         <span className="shrink-0 text-xs font-medium text-custod-muted">

@@ -43,9 +43,10 @@ type DataExport = {
 type ScanStore = {
   mode: "supabase" | "memory-dev";
   registerDevice(input: { deviceId?: string; platform: DevicePlatform; label?: string; userId?: string }): Promise<Device>;
+  listDevices(userId: string): Promise<Device[]>;
   createScan(response: AnalyzeBurnoutResponse, owner?: Owner): Promise<Scan>;
   getScan(id: string, owner?: Owner): Promise<Scan | null>;
-  listScans(owner?: Owner, limit?: number): Promise<Scan[]>;
+  listScans(owner?: Owner, limit?: number, deviceFilter?: string): Promise<Scan[]>;
   addReflection(scanId: string, input: ReflectionRequest, owner?: Owner): Promise<Reflection | null>;
   completeReset(scanId: string, completedSteps?: string[], owner?: Owner): Promise<{ resetStreak: ReturnType<typeof deriveProgress>["streaks"][number]; unlocked: Achievement[] } | null>;
   getEvents(owner?: Owner): Promise<ScanEvent[]>;
@@ -131,11 +132,31 @@ class MemoryScanStore implements ScanStore {
     return withReflection(scan, this.reflections.get(id));
   }
 
-  async listScans(owner?: Owner, limit = 30) {
+  async listScans(owner?: Owner, limit = 30, deviceFilter?: string) {
     return Array.from(this.scans.values())
       .filter((scan) => ownsOwner(scan, owner))
+      .filter((scan) => (owner?.userId && deviceFilter ? scan.deviceId === deviceFilter : true))
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
       .slice(0, limit);
+  }
+
+  async listDevices(userId: string) {
+    // Devices that have produced at least one scan for this user.
+    const ids = new Set(
+      Array.from(this.scans.values())
+        .filter((s) => s.userId === userId && s.deviceId)
+        .map((s) => s.deviceId as string)
+    );
+    return Array.from(ids).map(
+      (id) =>
+        this.devices.get(id) ?? {
+          id,
+          platform: "web" as DevicePlatform,
+          createdAt: new Date().toISOString(),
+          lastSeenAt: new Date().toISOString(),
+          syncEnabled: true,
+        }
+    );
   }
 
   async addReflection(scanId: string, input: ReflectionRequest, owner?: Owner) {
@@ -386,15 +407,26 @@ class SupabaseScanStore implements ScanStore {
     return data ? rowToScan(data) : null;
   }
 
-  async listScans(owner?: Owner, limit = 30) {
-    const builder = ownerEq(
+  async listScans(owner?: Owner, limit = 30, deviceFilter?: string) {
+    let builder = ownerEq(
       this.supabase.from("scans").select("*").order("created_at", { ascending: false }).limit(limit),
       owner
     );
+    // Within a signed-in account, optionally narrow to a single device.
+    if (owner?.userId && deviceFilter) builder = builder.eq("device_id", deviceFilter);
     const { data, error } = await query(builder);
     if (error) throw new Error(error.message);
     const rows = (data ?? []) as DbRow[];
     return rows.map((row) => rowToScan(row));
+  }
+
+  async listDevices(userId: string) {
+    const { data, error } = await query(
+      this.supabase.from("devices").select("*").eq("user_id", userId).order("last_seen_at", { ascending: false })
+    );
+    if (error) throw new Error(error.message);
+    const rows = (data ?? []) as DbRow[];
+    return rows.map((row) => rowToDevice(row));
   }
 
   async addReflection(scanId: string, input: ReflectionRequest, owner?: Owner) {

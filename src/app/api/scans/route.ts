@@ -59,6 +59,8 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const limit = Math.min(100, Math.max(1, Number(url.searchParams.get("limit") ?? 30)));
   const owner = await resolveOwner(request);
-  const scans = await getScanStore().listScans(owner, limit);
+  // Signed-in users can narrow to a single device with ?device=<id>; omitted = all devices combined.
+  const deviceFilter = owner.userId ? url.searchParams.get("device") ?? undefined : undefined;
+  const scans = await getScanStore().listScans(owner, limit, deviceFilter);
   return NextResponse.json({ scans });
 }
