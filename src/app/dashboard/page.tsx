@@ -17,6 +17,10 @@ import { getSupabaseBrowser, isSupabaseConfigured } from "@/lib/supabase";
 import { apiFetch } from "@/lib/device";
 import type { Scan } from "@/lib/types";
 import { LINKS } from "@/lib/custod-links";
+import { TrendView } from "@/components/dashboard/TrendView";
+import { SettingsView } from "@/components/dashboard/SettingsView";
+
+type View = "overview" | "trend" | "settings";
 
 const STATUS_STYLE: Record<string, { dot: string; label: string }> = {
   green: { dot: "bg-custod-status-green", label: "Stable" },
@@ -39,11 +43,10 @@ const SIGNALS: { label: string; hint: string; key: keyof Scan["riskBreakdown"] }
   { label: "Recovery signal", hint: "Signs you're already resetting", key: "recoverySignal" },
 ];
 
-const NAV = [
-  { label: "Overview", icon: LayoutDashboard, active: true },
-  { label: "Trend", icon: TrendingUp, active: false },
-  { label: "Privacy", icon: ShieldCheck, active: false },
-  { label: "Settings", icon: Settings, active: false },
+const NAV: { label: string; icon: React.ComponentType<{ className?: string }>; view: View }[] = [
+  { label: "Overview", icon: LayoutDashboard, view: "overview" },
+  { label: "Trend", icon: TrendingUp, view: "trend" },
+  { label: "Settings", icon: Settings, view: "settings" },
 ];
 
 export default function DashboardPage() {
@@ -51,6 +54,7 @@ export default function DashboardPage() {
   const [email, setEmail] = useState<string | null>(null);
   const [scans, setScans] = useState<Scan[]>([]);
   const [streak, setStreak] = useState(0);
+  const [view, setView] = useState<View>("overview");
   // When auth isn't configured, show the preview shell immediately.
   const [ready, setReady] = useState(!isSupabaseConfigured);
 
@@ -115,11 +119,12 @@ export default function DashboardPage() {
           </Link>
 
           <nav className="flex flex-1 flex-col gap-1">
-            {NAV.map(({ label, icon: Icon, active }) => (
+            {NAV.map(({ label, icon: Icon, view: v }) => (
               <button
                 key={label}
+                onClick={() => setView(v)}
                 className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${
-                  active
+                  view === v
                     ? "bg-custod-primary/10 text-custod-primary"
                     : "text-custod-muted hover:bg-[#f6f8f7]"
                 }`}
@@ -141,6 +146,21 @@ export default function DashboardPage() {
 
         {/* Main */}
         <main className="flex-1 px-5 py-8 md:px-10">
+          {/* Mobile tab switcher (sidebar is hidden on small screens) */}
+          <div className="mb-6 flex gap-1 rounded-xl border border-[#e2e8f0] bg-white p-1 md:hidden">
+            {NAV.map(({ label, view: v }) => (
+              <button
+                key={label}
+                onClick={() => setView(v)}
+                className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium transition ${view === v ? "bg-custod-primary/10 text-custod-primary" : "text-custod-muted"}`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {view === "trend" ? <TrendView /> : view === "settings" ? <SettingsView /> : (
+          <>
           <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h1 className="font-heading text-3xl tracking-tight">Hi, {firstName}</h1>
@@ -241,16 +261,18 @@ export default function DashboardPage() {
                 {scans.map((scan) => {
                   const style = STATUS_STYLE[scan.status];
                   return (
-                    <li key={scan.id} className="flex items-center gap-4 py-3">
-                      <span className={`size-3 shrink-0 rounded-full ${style?.dot ?? "bg-[#e2e8f0]"}`} />
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium">{scan.mainPattern || "Browser check"}</p>
-                        <p className="text-xs text-custod-muted">{formatWhen(scan.createdAt)}</p>
-                      </div>
-                      <span className="shrink-0 text-sm font-semibold tabular-nums">{scan.score}</span>
-                      <span className="shrink-0 text-xs font-medium text-custod-muted">
-                        {scan.statusLabel ?? style?.label}
-                      </span>
+                    <li key={scan.id}>
+                      <Link href={`/scan/${scan.id}`} className="-mx-2 flex items-center gap-4 rounded-xl px-2 py-3 transition hover:bg-[#f6f8f7]">
+                        <span className={`size-3 shrink-0 rounded-full ${style?.dot ?? "bg-[#e2e8f0]"}`} />
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-medium">{scan.mainPattern || "Browser check"}</p>
+                          <p className="text-xs text-custod-muted">{formatWhen(scan.createdAt)}</p>
+                        </div>
+                        <span className="shrink-0 text-sm font-semibold tabular-nums">{scan.score}</span>
+                        <span className="shrink-0 text-xs font-medium text-custod-muted">
+                          {scan.statusLabel ?? style?.label}
+                        </span>
+                      </Link>
                     </li>
                   );
                 })}
@@ -274,6 +296,8 @@ export default function DashboardPage() {
               </div>
             )}
           </section>
+          </>
+          )}
         </main>
       </div>
     </div>
