@@ -118,6 +118,47 @@ export async function signIn(email, password) {
   return { ok: true, session };
 }
 
+// Google OAuth via chrome.identity. Opens Supabase's /authorize in a web-auth
+// popup, lets Google + Supabase do the handshake, and catches the final
+// redirect back to https://<extension-id>.chromiumapp.org/ where Supabase
+// appends the tokens in the URL hash.
+export async function signInWithGoogle() {
+  if (!chrome.identity || !chrome.identity.launchWebAuthFlow) {
+    return { ok: false, error: "Browser identity API unavailable." };
+  }
+  const redirectUrl = chrome.identity.getRedirectURL();
+  const authUrl =
+    SUPABASE_URL +
+    "/auth/v1/authorize?provider=google&redirect_to=" +
+    encodeURIComponent(redirectUrl);
+
+  let responseUrl;
+  try {
+    responseUrl = await chrome.identity.launchWebAuthFlow({ url: authUrl, interactive: true });
+  } catch (e) {
+    return { ok: false, error: (e && e.message) || "Google sign-in was cancelled." };
+  }
+  if (!responseUrl) return { ok: false, error: "Google sign-in was cancelled." };
+
+  // Tokens come back in the hash fragment (#access_token=...&refresh_token=...).
+  const fragment = responseUrl.split("#")[1] || responseUrl.split("?")[1] || "";
+  const params = new URLSearchParams(fragment);
+  const errorDesc = params.get("error_description") || params.get("error");
+  if (errorDesc) return { ok: false, error: decodeURIComponent(errorDesc) };
+
+  const accessToken = params.get("access_token");
+  if (!accessToken) return { ok: false, error: "No access token returned from Google." };
+
+  const session = sessionFromAuthResponse({
+    access_token: accessToken,
+    refresh_token: params.get("refresh_token"),
+    expires_in: Number(params.get("expires_in")) || 3600
+  });
+  if (!session) return { ok: false, error: "Could not parse the Google sign-in session." };
+  await saveAuthSession(session);
+  return { ok: true, session };
+}
+
 export async function refreshAccessToken(refreshToken) {
   const result = await authFetch("/auth/v1/token?grant_type=refresh_token", {
     method: "POST",
@@ -198,7 +239,7 @@ export async function postToSupabase(endpoint, payload, accessToken, prefer = "r
       body: JSON.stringify(payload)
     });
     if (!res.ok) {
-      console.warn("[BurnoutCheck] postToSupabase non-OK:", res.status, endpoint);
+      console.warn("[Custod] postToSupabase non-OK:", res.status, endpoint);
       return null;
     }
     const text = await res.text();
@@ -209,7 +250,7 @@ export async function postToSupabase(endpoint, payload, accessToken, prefer = "r
       return {};
     }
   } catch (err) {
-    console.warn("[BurnoutCheck] postToSupabase failed:", err && err.message);
+    console.warn("[Custod] postToSupabase failed:", err && err.message);
     return null;
   }
 }
@@ -228,12 +269,12 @@ export async function patchToSupabase(endpoint, filterQuery, payload, accessToke
       body: JSON.stringify(payload)
     });
     if (!res.ok) {
-      console.warn("[BurnoutCheck] patchToSupabase non-OK:", res.status, url);
+      console.warn("[Custod] patchToSupabase non-OK:", res.status, url);
       return null;
     }
     return {};
   } catch (err) {
-    console.warn("[BurnoutCheck] patchToSupabase failed:", err && err.message);
+    console.warn("[Custod] patchToSupabase failed:", err && err.message);
     return null;
   }
 }
@@ -246,12 +287,12 @@ export async function getFromSupabase(endpoint, accessToken) {
       headers: authHeaders(accessToken)
     });
     if (!res.ok) {
-      console.warn("[BurnoutCheck] getFromSupabase non-OK:", res.status, endpoint);
+      console.warn("[Custod] getFromSupabase non-OK:", res.status, endpoint);
       return null;
     }
     return await res.json();
   } catch (err) {
-    console.warn("[BurnoutCheck] getFromSupabase failed:", err && err.message);
+    console.warn("[Custod] getFromSupabase failed:", err && err.message);
     return null;
   }
 }

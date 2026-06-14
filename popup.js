@@ -1,4 +1,4 @@
-// popup.js — auth gate + BurnoutCheck dashboard.
+// popup.js — auth gate + Custod dashboard.
 
 import { getAuthSession } from "./supabase.js";
 
@@ -30,6 +30,7 @@ function bindAuthUi() {
   const form = document.getElementById("authForm");
   const toggle = document.getElementById("authToggle");
   const logoutBtn = document.getElementById("logoutBtn");
+  const googleBtn = document.getElementById("googleSignIn");
 
   form.addEventListener("submit", onAuthSubmit);
   toggle.addEventListener("click", () => {
@@ -38,6 +39,25 @@ function bindAuthUi() {
     clearAuthError();
   });
   logoutBtn.addEventListener("click", onLogout);
+  googleBtn.addEventListener("click", onGoogleSignIn);
+}
+
+function onGoogleSignIn() {
+  clearAuthError();
+  const btn = document.getElementById("googleSignIn");
+  btn.disabled = true;
+  chrome.runtime.sendMessage({ type: "sign_in_google" }, (result) => {
+    btn.disabled = false;
+    if (chrome.runtime.lastError || !result) {
+      showAuthError("Could not reach the extension background.");
+      return;
+    }
+    if (!result.ok) {
+      showAuthError(result.error || "Google sign-in failed.");
+      return;
+    }
+    showApp(result.email);
+  });
 }
 
 function updateAuthModeUi() {

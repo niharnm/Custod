@@ -1,4 +1,4 @@
-// background.js — BurnoutCheck service worker.
+// background.js — Custod service worker.
 // Collects tab-behavior signals, scores them, logs site visits in hourly
 // sessions when authenticated, updates the badge, and answers popup queries.
 //
@@ -9,6 +9,7 @@ import {
   patchToSupabase,
   signUp,
   signIn,
+  signInWithGoogle,
   signOut,
   getValidAccessToken,
   getAuthUserId,
@@ -113,7 +114,7 @@ let lastVisitAt = 0;
     if (typeof stored.activeMsToday === "number") activeMsToday = stored.activeMsToday;
     if (typeof stored.lastAccountedAt === "number") lastAccountedAt = stored.lastAccountedAt;
   } catch (e) {
-    console.warn("[BurnoutCheck] rehydrate failed:", e && e.message);
+    console.warn("[Custod] rehydrate failed:", e && e.message);
   }
 
   const token = await getValidAccessToken();
@@ -410,7 +411,7 @@ async function ensureHourlySession() {
     if (rows && rows[0] && rows[0].id) {
       currentSessionId = rows[0].id;
     } else {
-      console.warn("[BurnoutCheck] failed to create hourly session");
+      console.warn("[Custod] failed to create hourly session");
       return null;
     }
   }
@@ -510,7 +511,7 @@ async function collectAndScore() {
   try {
     tabs = await chrome.tabs.query({});
   } catch (e) {
-    console.warn("[BurnoutCheck] tabs.query failed:", e && e.message);
+    console.warn("[Custod] tabs.query failed:", e && e.message);
   }
 
   const now = Date.now();
@@ -712,13 +713,13 @@ function showNotification(message) {
     chrome.notifications.create("burnout_red", {
       type: "basic",
       iconUrl: "icons/icon128.png",
-      title: "BurnoutCheck",
+      title: "Custod",
       message: message || "Burnout risk rising. Take a reset.",
       priority: 2,
       buttons: [{ title: "Take a 3-min reset" }]
     });
   } catch (e) {
-    console.warn("[BurnoutCheck] notification failed:", e && e.message);
+    console.warn("[Custod] notification failed:", e && e.message);
   }
 }
 
@@ -799,6 +800,21 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
   if (msg.type === "sign_in") {
     signIn(msg.email, msg.password).then(async (result) => {
+      if (result.ok) {
+        await onAuthSignedIn();
+        sendResponse({
+          ok: true,
+          email: result.session.user && result.session.user.email
+        });
+      } else {
+        sendResponse({ ok: false, error: result.error });
+      }
+    });
+    return true;
+  }
+
+  if (msg.type === "sign_in_google") {
+    signInWithGoogle().then(async (result) => {
       if (result.ok) {
         await onAuthSignedIn();
         sendResponse({

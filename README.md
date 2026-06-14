@@ -1,4 +1,4 @@
-# BurnoutCheck — Chrome Extension (Manifest V3)
+# Custod — Chrome Extension (Manifest V3)
 
 A privacy-first burnout detector. It reads tab-behavior patterns — counts, URLs,
 titles, and timing — and scores your stress in real time. **It never reads page
