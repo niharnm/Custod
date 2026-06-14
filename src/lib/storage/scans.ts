@@ -320,7 +320,11 @@ class SupabaseScanStore implements ScanStore {
 
   async registerDevice(input: { deviceId?: string; platform: DevicePlatform; label?: string; userId?: string }) {
     const now = new Date().toISOString();
-    const id = input.deviceId || generateId();
+    const id = isUuid(input.deviceId) ? (input.deviceId as string) : generateId();
+    // devices.user_id → profiles(id); Supabase doesn't auto-create the profile.
+    if (input.userId) {
+      await query(this.supabase.from("profiles").upsert({ id: input.userId }, { onConflict: "id", ignoreDuplicates: true }));
+    }
     const row = {
       id,
       user_id: input.userId ?? null,
