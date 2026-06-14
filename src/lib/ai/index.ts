@@ -1,6 +1,22 @@
 import type { AnalyzeBurnoutRequest, AnalyzeBurnoutResponse } from "@/lib/types";
 import { z } from "zod";
 
+// Shared Groq key bundled with Custod so AI reasoning works out of the box on
+// every install — no one has to bring their own key. `GROQ_API_KEY` in the
+// environment (e.g. a Vercel project var) always takes precedence and is the
+// right place to override or rotate this without a code change.
+//
+// SECURITY: this is a real secret living in source control. It is exposed to
+// anyone with repo access and to GitHub secret scanning, which may auto-revoke
+// it. Rotate it (here + macOS AIConfig + Vercel) before any public launch, and
+// prefer moving it to a server-only env var when you can. The key is only ever
+// used server-side in these route handlers — it is never sent to the browser,
+// extension, or native clients.
+const DEFAULT_GROQ_API_KEY = "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";
+
+/** Resolved Groq key: environment override first, then the bundled default. */
+export const GROQ_API_KEY = process.env.GROQ_API_KEY || DEFAULT_GROQ_API_KEY;
+
 const wordingSchema = z.object({
   oneSentenceExplanation: z.string().min(20).max(300),
   patternExplanation: z.string().min(40).max(800),
@@ -41,7 +57,7 @@ async function analyzeWithAI(
   input: AnalyzeBurnoutRequest,
   rules: AnalyzeBurnoutResponse
 ): Promise<WordingResult | null> {
-  if (process.env.GROQ_API_KEY) return callGroq(input, rules);
+  if (GROQ_API_KEY) return callGroq(input, rules);
   if (process.env.OPENAI_API_KEY) return callOpenAI(input, rules);
   if (process.env.GEMINI_API_KEY) return callGemini(input, rules);
   return null;
@@ -56,7 +72,7 @@ async function callGroq(input: AnalyzeBurnoutRequest, rules: AnalyzeBurnoutRespo
     const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+        Authorization: `Bearer ${GROQ_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({

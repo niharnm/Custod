@@ -14,12 +14,16 @@ import Foundation
 //   2. The GROQ_API_KEY environment variable (handy for dev runs from Xcode).
 //   3. `bundledDefaultKey` below.
 enum AIConfig {
-    /// Default Groq key baked into this build. Empty string = no bundled key.
+    /// Default Groq key baked into this build so AI reasoning works out of the
+    /// box — users don't have to bring their own key. A key pasted in Settings or
+    /// a GROQ_API_KEY env var still takes precedence (see resolvedGroqKey).
     ///
-    /// Intentionally EMPTY so no secret lives in source control. Provide a key at
-    /// runtime instead — paste it in Settings (stored in local UserDefaults) or
-    /// set the GROQ_API_KEY environment variable. See SettingsStore.resolvedGroqKey.
-    static let bundledDefaultKey = ""
+    /// SECURITY: a key shipped in a client binary can be extracted by anyone with
+    /// the app, and it lives in source control / GitHub secret scanning may
+    /// auto-revoke it. Rotate it here (+ web `src/lib/ai/index.ts` and Vercel)
+    /// before any public launch; prefer routing through the web backend so the
+    /// key stays server-side.
+    static let bundledDefaultKey = "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"
 
     /// Groq model used for the reasoning pass. Fast, JSON-mode capable.
     static let model = "llama-3.3-70b-versatile"

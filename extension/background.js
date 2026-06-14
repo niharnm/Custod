@@ -164,6 +164,20 @@ function hostnameOf(url) {
   }
 }
 
+// Drop the query string and fragment so stored URLs never carry search terms,
+// session tokens, or other PII. Keeps origin + path only. Mirrors the web
+// backend's stripUrlForStorage() in src/lib/privacy.
+function stripQueryAndHash(url) {
+  try {
+    const u = new URL(url);
+    u.search = "";
+    u.hash = "";
+    return u.toString();
+  } catch (_) {
+    return String(url).split("?")[0].split("#")[0];
+  }
+}
+
 function isDistraction(url) {
   const host = hostnameOf(url);
   if (!host) return false;
@@ -486,8 +500,12 @@ function getCurrentSessionId() {
 // ---------------------------------------------------------------------------
 chrome.webNavigation.onCompleted.addListener(async (details) => {
   if (details.frameId !== 0) return;
-  const url = details.url || "";
-  if (!isTrackableUrl(url)) return;
+  const rawUrl = details.url || "";
+  if (!isTrackableUrl(rawUrl)) return;
+  // PRIVACY: never store the query string or fragment — those can carry search
+  // terms, session tokens, and other PII. We keep only origin + path, matching
+  // the web backend's stripUrlForStorage(). Custod works on safe signals only.
+  const url = stripQueryAndHash(rawUrl);
 
   const token = await getValidAccessToken();
   if (!token) return;
@@ -917,12 +935,6 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.type === "auth_signed_in") {
     onAuthSignedIn().then(() => sendResponse({ ok: true }));
     return true;
-  }
-
-  if (msg.type === "frustration_event") {
-    frustrationCount++;
-    persistVolatile();
-    return false;
   }
 
   if (msg.type === "force_rescore") {
