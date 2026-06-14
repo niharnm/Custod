@@ -13,6 +13,7 @@ import {
   Smartphone,
   TrendingUp,
 } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -253,7 +254,15 @@ export default function DashboardPage() {
       <div className="mx-auto flex max-w-7xl">
         {/* Sidebar */}
         <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col border-r border-[#e2e8f0] bg-white px-4 py-6 md:flex">
-          <Link href="/" className="mb-8 px-2 font-heading text-2xl font-semibold tracking-tight">
+          <Link href="/" className="mb-8 inline-flex items-center gap-2 px-2 font-heading text-2xl font-semibold tracking-tight">
+            <Image
+              src="/logo.png"
+              alt=""
+              width={32}
+              height={32}
+              className="size-8 rounded-lg border border-[#e2e8f0] bg-white"
+              priority
+            />
             Custod
           </Link>
 

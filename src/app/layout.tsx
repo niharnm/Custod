@@ -28,9 +28,15 @@ export const metadata: Metadata = {
   description:
     "A privacy-first, cross-platform check engine light for burnout. Custod fuses browser, computer, phone, and desk signals into one real-time green, yellow, or red status — before you crash.",
   applicationName: "Custod",
+  manifest: "/manifest.webmanifest",
   icons: {
-    icon: "/seo/favicon.svg",
-    apple: "/seo/favicon.svg",
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/icon.png", type: "image/png", sizes: "512x512" },
+      { url: "/seo/favicon-32x32.png", type: "image/png", sizes: "32x32" },
+      { url: "/seo/favicon-16x16.png", type: "image/png", sizes: "16x16" },
+    ],
+    apple: "/apple-icon.png",
   },
 };
 

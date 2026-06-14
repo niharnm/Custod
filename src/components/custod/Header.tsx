@@ -1,6 +1,7 @@
 "use client";
 
 import { Menu, X } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import type { AuthChangeEvent, Session } from "@supabase/supabase-js";
@@ -49,8 +50,16 @@ export function Header() {
         <div className="mx-auto flex max-w-6xl items-center justify-between py-5">
           <Link
             href="/"
-            className="font-heading text-2xl font-semibold tracking-tight text-white"
+            className="inline-flex items-center gap-2 font-heading text-2xl font-semibold tracking-tight text-white"
           >
+            <Image
+              src="/logo.png"
+              alt=""
+              width={32}
+              height={32}
+              className="size-8 rounded-lg bg-white"
+              priority
+            />
             Custod
           </Link>
 

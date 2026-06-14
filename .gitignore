@@ -53,3 +53,6 @@ xcuserdata/
 *.xcuserstate
 DerivedData/
 *.xcscmblueprint
+
+# Xcode build output (this template uses a custom derived-data path)
+.derived-data/

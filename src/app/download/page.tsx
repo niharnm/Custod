@@ -1,4 +1,5 @@
 import { Apple, ArrowLeft, Puzzle } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import { LINKS } from "@/lib/custod-links";
 
@@ -21,6 +22,14 @@ export default function DownloadPage() {
 
       <div className="mx-auto max-w-3xl">
         <div className="mt-8 text-center text-white">
+          <Image
+            src="/logo.png"
+            alt=""
+            width={64}
+            height={64}
+            className="mx-auto mb-4 size-16 rounded-2xl bg-white"
+            priority
+          />
           <h1 className="font-heading text-4xl tracking-tight md:text-5xl">Get Custod</h1>
           <p className="mx-auto mt-3 max-w-xl text-white/85">
             Run a check in seconds. Free, private, and it never reads your page contents.

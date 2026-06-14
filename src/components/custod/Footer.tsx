@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { FOOTER_GROUPS } from "@/lib/custod-content";
 
@@ -10,8 +11,15 @@ export function Footer() {
         <div>
           <Link
             href="/"
-            className="font-heading text-2xl font-semibold text-[#0f172a]"
+            className="inline-flex items-center gap-2 font-heading text-2xl font-semibold text-[#0f172a]"
           >
+            <Image
+              src="/logo.png"
+              alt=""
+              width={32}
+              height={32}
+              className="size-8 rounded-lg border border-[#e2e8f0] bg-white"
+            />
             Custod
           </Link>
           <p className="mt-3 max-w-xs text-sm text-custod-muted">

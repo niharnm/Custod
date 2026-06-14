@@ -1,6 +1,7 @@
 "use client";
 
 import { ArrowLeft, Loader2 } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -93,9 +94,14 @@ export default function LoginPage() {
 
       <div className="w-full max-w-md">
         <div className="mb-8 flex flex-col items-center text-center text-white">
-          <span className="mb-4 grid size-12 place-items-center rounded-2xl bg-white/15 backdrop-blur-sm">
-            <span className="size-3 rounded-full bg-custod-status-green" />
-          </span>
+          <Image
+            src="/logo.png"
+            alt=""
+            width={56}
+            height={56}
+            className="mb-4 size-14 rounded-2xl bg-white"
+            priority
+          />
           <h1 className="font-heading text-3xl tracking-tight">
             {mode === "signin" ? "Welcome back" : "Create your Custod account"}
           </h1>
