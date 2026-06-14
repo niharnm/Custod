@@ -119,9 +119,11 @@ final class BurnoutMonitor: ObservableObject {
         // Access is granted; otherwise fall back to Custod's live since-launch count.
         if let system = ScreenTimeReader.today() {
             usesSystemScreenTime = true
-            u.activeMinutesToday = system.totalMinutes
+            // System data is whole-day and should dominate, but never show less
+            // than what we've directly observed active this session.
+            u.activeMinutesToday = max(system.totalMinutes, u.activeMinutesToday)
             appUsage = AppUsageSnapshot(apps: system.apps,
-                                        totalMinutes: system.totalMinutes,
+                                        totalMinutes: max(system.totalMinutes, live.totalMinutes),
                                         frontApp: live.frontApp)
         } else {
             usesSystemScreenTime = false

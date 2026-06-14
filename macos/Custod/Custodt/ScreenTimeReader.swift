@@ -80,6 +80,11 @@ enum ScreenTimeReader {
                 apps.append(AppUsage(name: displayName(for: bundle), bundleID: bundle, minutes: minutes))
             }
         }
+        // An empty read (Full Disk Access granted but the knowledge store has no
+        // usage rows for today yet, or the schema changed) is not real data —
+        // return nil so the caller falls back to the live counter instead of
+        // showing a misleading "0m" as if it came from macOS.
+        guard totalSeconds > 0 else { return nil }
         return ScreenTimeSnapshot(totalMinutes: Int(totalSeconds / 60), apps: apps)
     }
 

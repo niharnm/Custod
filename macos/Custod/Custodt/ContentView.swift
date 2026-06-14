@@ -281,6 +281,7 @@ private struct DashboardView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 topBar
+                if !monitor.usesSystemScreenTime { fdaBanner }
                 heroCard
                 statsGrid
                 appsCard
@@ -330,6 +331,44 @@ private struct DashboardView: View {
             }
             .buttonStyle(.plain).foregroundStyle(Color.brand)
         }
+    }
+
+    /// Unmissable call to action when macOS's real Screen Time isn't readable.
+    /// Until Full Disk Access is granted, the "Screen time today" figure is only
+    /// Custod's own since-launch estimate — the source of the "it says I've only
+    /// had 58 minutes" confusion. macOS never prompts for Full Disk Access and
+    /// the grant only takes effect after the app is reopened, so we spell both out.
+    private var fdaBanner: some View {
+        Card {
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: "lock.shield.fill")
+                    .font(.title2).foregroundStyle(Color.warn)
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Showing an estimate, not your real Screen Time")
+                        .font(.system(.headline, design: .rounded))
+                    Text("Custod can read your Mac's actual Screen Time — the whole day, every app, even from before it launched. macOS won't prompt for it, so turn on Full Disk Access for Custod, then quit and reopen the app for it to take effect.")
+                        .font(.system(.subheadline, design: .rounded))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    HStack(spacing: 12) {
+                        Button { Permissions.openSettings(.fullDiskAccess) } label: {
+                            Text("Open Full Disk Access settings")
+                                .font(.system(.subheadline, design: .rounded).weight(.semibold))
+                        }
+                        .buttonStyle(.borderedProminent).tint(Color.brand)
+                        Button { monitor.refreshNow() } label: {
+                            Text("I've enabled it — recheck")
+                                .font(.system(.subheadline, design: .rounded).weight(.semibold))
+                        }
+                        .buttonStyle(.plain).foregroundStyle(Color.brand)
+                    }
+                    .padding(.top, 2)
+                }
+                Spacer(minLength: 0)
+            }
+        }
+        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous)
+            .strokeBorder(Color.warn.opacity(0.35), lineWidth: 1))
     }
 
     private var modePill: some View {

@@ -25,12 +25,19 @@ final class UsageTracker {
     private var continuousSeconds: Double = 0
     private var lastSampleAt: Date?
 
+    /// Today's active total is persisted so the fallback (when macOS Screen Time
+    /// isn't readable) reflects the *whole day*, not just time since this launch.
+    /// Without this, quitting and reopening Custod would reset screen time to 0
+    /// and slowly climb again — the "it only counts how long it's been open" bug.
+    private let store = UserDefaults.standard
+    private static let activeKeyPrefix = "usage.activeSeconds."
+
     func sample(now: Date = Date()) -> UsageStats {
         let cal = Calendar.current
         let key = Self.dayKey(now, cal)
-        if key != dayKey {            // new day → reset daily counters
+        if key != dayKey {            // new day (or first sample) → load persisted total
             dayKey = key
-            activeSeconds = 0
+            activeSeconds = store.double(forKey: Self.activeKeyPrefix + key)
             continuousSeconds = 0
             lastSampleAt = nil
         }
@@ -43,6 +50,7 @@ final class UsageTracker {
         if active {
             activeSeconds += elapsed
             continuousSeconds += elapsed
+            store.set(activeSeconds, forKey: Self.activeKeyPrefix + key)
         } else {
             continuousSeconds = 0
         }
