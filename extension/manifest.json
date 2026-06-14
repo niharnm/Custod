@@ -1,0 +1,44 @@
+{
+  "manifest_version": 3,
+  "name": "Custod",
+  "version": "1.3.0",
+  "description": "Privacy-first burnout detector. Reads tab behavior patterns (never page content) and scores your stress in real time.",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAs8JwJgk1zaAg7kkFscJ+GRP7kiCTLw8n++arwhFYSXzlBI7vo6Gy3WMpUKRhSI8nxmPYeeUNO+jZsWRYZYO8deouALa5dhTRKcLC7P3PeWTYPKAFfhmmyN2rd44U9HLim+ZITAX7Hds3kiNS2+uj8w/Wiyytxny51r4bTIIaa8E0xYaOdpNOI4hK+ryq5ND0c1DOseIWGAE59f5+O/33UbNmCETngbyULUnTQXjN3kSlVwyc2ZRE6hK3Dtsdihdup41s1NQJgbuXCJGVxYTxhnMu7vAGUKwhQ9fJe/bI+ARnhhj3Zq9n/RZlmZweJFYWNlTBNZg2HCSvHDwaENw1zwIDAQAB",
+  "permissions": ["tabs", "storage", "alarms", "notifications", "activeTab", "webNavigation", "idle", "identity"],
+  "host_permissions": ["<all_urls>"],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Custod"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "http://localhost/*",
+        "http://127.0.0.1/*",
+        "https://*.vercel.app/*"
+      ],
+      "js": ["bridge.js"],
+      "run_at": "document_start"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["reset.html"],
+      "matches": ["<all_urls>"]
+    }
+  ],
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}

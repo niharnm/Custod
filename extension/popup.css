@@ -1,0 +1,369 @@
+:root {
+  --green: #1d9e75;
+  --yellow: #ba7517;
+  --red: #e24b4a;
+  --border: #e5e5e5;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  width: 300px;
+  margin: 0;
+  background: #ffffff;
+  color: #1a1a1a;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Header */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 0.5px solid var(--border);
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.2px;
+}
+.brand-logo {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+  border-radius: 4px;
+}
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--green);
+}
+.dashboard-btn {
+  border: 0.5px solid var(--border);
+  background: #fff;
+  font-size: 10px;
+  font-weight: 600;
+  color: #1a1a1a;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 5px;
+}
+.dashboard-btn:hover {
+  background: #f5f5f5;
+}
+.logout-btn {
+  border: none;
+  background: none;
+  font-size: 10px;
+  color: #888;
+  cursor: pointer;
+  padding: 0;
+}
+.logout-btn:hover {
+  color: #444;
+}
+.user-email {
+  font-size: 10px;
+  color: #888;
+  padding: 0 16px 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hidden {
+  display: none !important;
+}
+
+/* Auth */
+.auth-body {
+  padding: 16px;
+}
+.auth-title {
+  margin: 0 0 4px;
+  font-size: 16px;
+  font-weight: 600;
+}
+.auth-sub {
+  margin: 0 0 16px;
+  font-size: 11px;
+  color: #666;
+  line-height: 1.4;
+}
+.google-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 9px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #1a1a1a;
+  background: #fff;
+  border: 0.5px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+}
+.google-btn:hover {
+  background: #f6f6f6;
+}
+.google-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.google-icon {
+  flex-shrink: 0;
+}
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 14px 0;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #999;
+}
+.auth-divider::before,
+.auth-divider::after {
+  content: "";
+  flex: 1;
+  height: 0.5px;
+  background: var(--border);
+}
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.auth-label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11px;
+  color: #555;
+}
+.auth-label input {
+  padding: 8px 10px;
+  border: 0.5px solid var(--border);
+  border-radius: 6px;
+  font-size: 13px;
+}
+.auth-error {
+  font-size: 11px;
+  color: var(--red);
+  line-height: 1.35;
+}
+.auth-submit {
+  margin-top: 4px;
+  padding: 9px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+  background: #1a1a1a;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.auth-submit:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.auth-toggle {
+  margin-top: 12px;
+  width: 100%;
+  padding: 0;
+  border: none;
+  background: none;
+  font-size: 11px;
+  color: #666;
+  cursor: pointer;
+  text-align: center;
+}
+.auth-toggle:hover {
+  color: #1a1a1a;
+}
+
+/* Score ring */
+.ring-wrap {
+  position: relative;
+  width: 140px;
+  height: 140px;
+  margin: 16px auto 8px;
+}
+.ring-center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+.score-num {
+  font-size: 32px;
+  font-weight: 700;
+  line-height: 1;
+}
+.status-label {
+  font-size: 11px;
+  color: #666;
+  margin-top: 4px;
+}
+
+/* Stats */
+.stats {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  padding: 8px 16px 12px;
+}
+.stat {
+  flex: 1;
+  text-align: center;
+}
+.stat-val {
+  font-size: 16px;
+  font-weight: 600;
+}
+.stat-label {
+  font-size: 10px;
+  color: #888;
+  margin-top: 2px;
+}
+.stat-divider {
+  width: 0.5px;
+  height: 28px;
+  background: var(--border);
+}
+
+.divider {
+  height: 0.5px;
+  background: var(--border);
+  margin: 0 16px;
+}
+
+/* Trigger pills */
+.triggers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 12px 16px 4px;
+}
+.trigger-pill {
+  font-size: 11px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+/* Intervention */
+.intervention {
+  margin: 8px 16px 4px;
+  padding: 12px;
+  background: #f7f7f7;
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: #2a2a2a;
+}
+.intervention:empty {
+  display: none;
+}
+
+/* Actions */
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 16px 4px;
+}
+.action-btn {
+  width: 100%;
+  padding: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  background: #ffffff;
+  border: 0.5px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  color: #1a1a1a;
+  transition: background 0.12s ease;
+}
+.action-btn:hover {
+  background: #f5f5f5;
+}
+
+/* Sparkline */
+.sparkline-label {
+  font-size: 10px;
+  color: #888;
+  margin: 12px 16px 4px;
+}
+.sparkline {
+  display: block;
+  margin: 0 16px 8px;
+}
+
+/* Privacy */
+.privacy {
+  font-size: 10px;
+  color: #bbb;
+  text-align: center;
+  padding: 10px 16px 14px;
+  border-top: 0.5px solid var(--border);
+  line-height: 1.4;
+}
+
+/* Continue-without-account link on the auth view */
+.auth-skip {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+  padding: 6px;
+  border: none;
+  background: none;
+  color: #999;
+  font-size: 12px;
+  cursor: pointer;
+}
+.auth-skip:hover { color: #555; }
+
+/* Sign-in nudge shown in the dashboard when running local-only */
+.signin-nudge {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0 16px 10px;
+  padding: 8px 10px;
+  background: rgba(29, 158, 117, 0.1);
+  border: 0.5px solid rgba(29, 158, 117, 0.3);
+  border-radius: 8px;
+  font-size: 11px;
+  color: #2a5d4c;
+}
+.signin-nudge button {
+  flex: none;
+  border: none;
+  border-radius: 6px;
+  background: var(--green);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 5px 10px;
+  cursor: pointer;
+}

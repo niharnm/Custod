@@ -258,6 +258,8 @@ export const FOOTER_GROUPS: FooterLinkGroup[] = [
     title: "Trust",
     links: [
       { label: "Privacy", href: "#privacy" },
+      { label: "Privacy Policy", href: "/privacy" },
+      { label: "Terms of Service", href: "/terms" },
       { label: "FAQ", href: "#faq" },
     ],
   },
@@ -266,7 +268,8 @@ export const FOOTER_GROUPS: FooterLinkGroup[] = [
     links: [
       { label: "Sign in", href: "/login" },
       { label: "Dashboard", href: "/dashboard" },
-      { label: "Contact", href: "mailto:hello@custod.app" },
+      { label: "Support", href: "/support" },
+      { label: "Contact", href: "mailto:nihar.manchikalapudi@gmail.com" },
     ],
   },
 ];

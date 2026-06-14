@@ -16,6 +16,9 @@ enum CustodConfig {
         envURL("CUSTOD_WEB_URL") ?? URL(string: "http://localhost:3000")!
     }
 
+    /// Contact address for privacy, support, and data requests.
+    static let contactEmail = "nihar.manchikalapudi@gmail.com"
+
     /// Supabase project URL — the SAME project the website and extension use, so
     /// a Google account on the web resolves to the same user here.
     static var supabaseURL: URL {

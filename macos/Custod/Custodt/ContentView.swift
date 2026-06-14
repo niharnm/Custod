@@ -752,6 +752,7 @@ private struct SettingsView: View {
                     aiCard
                     supervisedCard
                 }
+                aboutCard
             }
             .padding(24)
             .frame(maxWidth: 760)
@@ -878,6 +879,29 @@ private struct SettingsView: View {
                 .fixedSize(horizontal: false, vertical: true)
             if settings.supervisedMode {
                 PINManager()
+            }
+        }
+    }
+
+    private var aboutCard: some View {
+        Card {
+            Label("About & privacy", systemImage: "lock.shield")
+                .font(.system(.headline, design: .rounded).weight(.bold))
+            Text("Custod only analyzes safe signals like tab titles, URLs/domains, optional check-ins, on-device usage timing, and scan history. It never reads page contents, keystrokes, screenshots, or private messages.")
+                .font(.system(.caption, design: .rounded)).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            Text("Custod is not a diagnosis, therapy, or crisis-support tool. It shows digital strain patterns and reset suggestions.")
+                .font(.system(.caption2, design: .rounded)).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            HStack(spacing: 16) {
+                Link("Privacy", destination: CustodConfig.webAppURL.appendingPathComponent("privacy"))
+                Link("Terms", destination: CustodConfig.webAppURL.appendingPathComponent("terms"))
+                Link("Support", destination: CustodConfig.webAppURL.appendingPathComponent("support"))
+            }
+            .font(.system(.caption, design: .rounded).weight(.medium)).tint(Color.brand)
+            if let mailto = URL(string: "mailto:\(CustodConfig.contactEmail)") {
+                Link("Contact: \(CustodConfig.contactEmail)", destination: mailto)
+                    .font(.system(.caption2, design: .rounded)).tint(Color.brand)
             }
         }
     }

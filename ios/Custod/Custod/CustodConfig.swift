@@ -8,6 +8,17 @@ import Foundation
 // The Supabase URL and anon ("publishable") key are PUBLIC values, safe to ship
 // in a client binary. The service-role / secret key is never here.
 enum CustodConfig {
+    /// Base URL of the Custod web app / API — the SAME backend the macOS app,
+    /// extension, and website use. Override with CUSTOD_WEB_URL for dev builds.
+    /// Used for the privacy/terms/support links shown in the app and, later, for
+    /// posting check-ins to `/api/scans`.
+    static var webAppURL: URL {
+        envURL("CUSTOD_WEB_URL") ?? URL(string: "https://custod.vercel.app")!
+    }
+
+    /// Contact address for privacy, support, and data requests.
+    static let contactEmail = "nihar.manchikalapudi@gmail.com"
+
     static var supabaseURL: URL {
         envURL("CUSTOD_SUPABASE_URL") ?? URL(string: "https://vdzugcxkqzfauaywiria.supabase.co")!
     }

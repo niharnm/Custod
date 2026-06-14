@@ -1,171 +1,153 @@
-# AI Website Cloner Template
+# Custod
 
-<a href="https://github.com/JCodesMore/ai-website-cloner-template/blob/master/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT License" /></a> <a href="https://github.com/JCodesMore/ai-website-cloner-template/stargazers"><img src="https://img.shields.io/github/stars/JCodesMore/ai-website-cloner-template?style=flat" alt="Stars" /></a> <a href="https://discord.gg/hrTSX5yTpB"><img src="https://img.shields.io/discord/1400896964597383279?label=discord" alt="Discord" /></a>
+**Your burnout check engine light.** Custod is a privacy-first, cross-platform
+early-signal tool for **digital strain and burnout patterns** — a calm green /
+yellow / red status that surfaces *before* you crash, with simple resets to
+recover focus.
 
-A reusable template for reverse-engineering any website into a clean, modern Next.js codebase using AI coding agents. 
+> Repo: <https://github.com/niharnm/Custod>
 
-**Recommended: [Claude Code](https://docs.anthropic.com/en/docs/claude-code) with Opus 4.7 for best results** — but works with a variety of AI coding agents.
+## What Custod is
 
-Point it at a URL, run `/clone-website`, and your AI agent will inspect the site, extract design tokens and assets, write component specs, and dispatch parallel builders to reconstruct every section.
+- An **ambient, early-warning signal** for burnout patterns — like a check
+  engine light, not a dashboard you have to babysit.
+- **Privacy-first.** It reads only safe signals (tab titles, URLs/domains,
+  optional check-ins, on-device usage timing) and turns them into a status +
+  reset suggestions.
+- **Cross-platform, one account.** Sign in once; your data follows you across the
+  Chrome extension, macOS app, iOS app, and web dashboard (the "Grammarly"
+  model). See [`docs/ECOSYSTEM_SYNC.md`](docs/ECOSYSTEM_SYNC.md).
 
-## Demo
+## What Custod is not
 
-[![Watch the demo](docs/design-references/comparison.png)](https://youtu.be/O669pVZ_qr0)
+- ❌ Not therapy, an AI therapist, or a mental-health chatbot.
+- ❌ Not a diagnosis — it never diagnoses any condition.
+- ❌ Not crisis support.
+- ❌ It never reads full page contents, keystrokes, screenshots, or private
+  messages. See [`docs/PRIVACY_SAFETY.md`](docs/PRIVACY_SAFETY.md).
 
-> Click the image above to watch the full demo on YouTube.
-
-## Quick Start
-
-> **Important:** Start by making your own copy with GitHub's **Use this template** button. Do not clone this template repository directly for your website project, and do not open pull requests here with your generated website.
-
-1. **Create your own repository from this template**
-
-   On the GitHub page for this project, click **Use this template**, then click **Create a new repository**.
-
-   Give your new repository a name, choose whether it should be public or private, then click **Create repository**. If GitHub shows an **Include all branches** option, you can leave it off.
-
-   This gives you your own separate project to work in, so your website changes stay in your account instead of coming back to the main template.
-
-2. **Open your new repository on your computer**
-
-   After GitHub creates your copy, open that new repository. Click **Code** and open or clone your new repository with your preferred coding tool.
-
-   If you use the terminal, the command will look like this:
-
-   ```bash
-   git clone https://github.com/YOUR-USERNAME/YOUR-NEW-REPOSITORY.git
-   cd YOUR-NEW-REPOSITORY
-   ```
-
-3. **Install dependencies**
-   ```bash
-   npm install
-   ```
-4. **Start your AI agent** — Claude Code recommended:
-   ```bash
-   claude --chrome
-   ```
-5. **Run the skill**:
-   ```
-   /clone-website <target-url1> [<target-url2> ...]
-   ```
-6. **Customize** (optional) — after the base clone is built, modify as needed
-
-> Using a different agent? Open `AGENTS.md` for project instructions — most agents pick it up automatically.
-
-## Supported Platforms
-
-| Agent                                                         | Status                     |
-| ------------------------------------------------------------- | -------------------------- |
-| [Claude Code](https://docs.anthropic.com/en/docs/claude-code) | **Recommended** — Opus 4.7 |
-| [Codex CLI](https://github.com/openai/codex)                  | Supported                  |
-| [OpenCode](https://opencode.ai/)                              | Supported                  |
-| [GitHub Copilot](https://github.com/features/copilot)         | Supported                  |
-| [Cursor](https://cursor.com/)                                 | Supported                  |
-| [Windsurf](https://codeium.com/windsurf)                      | Supported                  |
-| [Gemini CLI](https://github.com/google-gemini/gemini-cli)     | Supported                  |
-| [Cline](https://github.com/cline/cline)                       | Supported                  |
-| [Roo Code](https://github.com/RooCodeInc/Roo-Code)            | Supported                  |
-| [Continue](https://continue.dev/)                             | Supported                  |
-| [Amazon Q](https://aws.amazon.com/q/developer/)               | Supported                  |
-| [Augment Code](https://www.augmentcode.com/)                  | Supported                  |
-| [Aider](https://aider.chat/)                                  | Supported                  |
-
-## Prerequisites
-
-- [Node.js](https://nodejs.org/) 24+
-- An AI coding agent (see [Supported Platforms](#supported-platforms))
-
-## Tech Stack
-
-- **Next.js 16** — App Router, React 19, TypeScript strict
-- **shadcn/ui** — Radix primitives + Tailwind CSS v4
-- **Tailwind CSS v4** — oklch design tokens
-- **Lucide React** — default icons (replaced by extracted SVGs during cloning)
-
-## How It Works
-
-The `/clone-website` skill runs a multi-phase pipeline:
-
-1. **Reconnaissance** — screenshots, design token extraction, interaction sweep (scroll, click, hover, responsive)
-2. **Foundation** — updates fonts, colors, globals, downloads all assets
-3. **Component Specs** — writes detailed spec files (`docs/research/components/`) with exact computed CSS values, states, behaviors, and content
-4. **Parallel Build** — dispatches builder agents in git worktrees, one per section/component
-5. **Assembly & QA** — merges worktrees, wires up the page, runs visual diff against the original
-
-Each builder agent receives the full component specification inline — exact `getComputedStyle()` values, interaction models, multi-state content, responsive breakpoints, and asset paths. No guessing.
-
-## Use Cases
-
-- **Platform migration** — rebuild a site you own from WordPress/Webflow/Squarespace into a modern Next.js codebase
-- **Lost source code** — your site is live but the repo is gone, the developer left, or the stack is legacy. Get the code back in a modern format
-- **Learning** — deconstruct how production sites achieve specific layouts, animations, and responsive behavior by working with real code
-
-## Not Intended For
-
-- **Phishing or impersonation** — this project must not be used for deceptive purposes, impersonation, or any activity that breaks the law.
-- **Passing off someone's design as your own** — logos, brand assets, and original copy belong to their owners.
-- **Violating terms of service** — some sites explicitly prohibit scraping or reproduction. Check first.
-
-## Project Structure
+## Repo structure
 
 ```
-src/
-  app/              # Next.js routes
-  components/       # React components
-    ui/             # shadcn/ui primitives
-    icons.tsx       # Extracted SVG icons
-  lib/utils.ts      # cn() utility
-  types/            # TypeScript interfaces
-  hooks/            # Custom React hooks
-public/
-  images/           # Downloaded images from target
-  videos/           # Downloaded videos from target
-  seo/              # Favicons, OG images
-docs/
-  research/         # Extraction output & component specs
-  design-references/ # Screenshots
-scripts/
-  sync-agent-rules.sh  # Regenerate agent instruction files
-  sync-skills.mjs      # Regenerate /clone-website for all platforms
-AGENTS.md           # Agent instructions (single source of truth)
-CLAUDE.md           # Claude Code config (imports AGENTS.md)
-GEMINI.md           # Gemini CLI config (imports AGENTS.md)
+src/                  # Next.js 16 web app + dashboard + backend API (the hub)
+  app/api/**          # Backend routes (scans, devices, trends, share, export…)
+  app/{privacy,terms,support}/  # Legal + support pages
+  lib/                # owner/auth, scoring, ai wording, storage, validation
+extension/            # Chrome/MV3 extension (passive tab-pattern monitor)
+ios/Custod/           # SwiftUI iOS app (account-first; Screen Time pending)
+macos/Custod/         # SwiftUI macOS menu-bar app (most complete native client)
+supabase/             # DB schema / SQL
+docs/                 # API contracts, design system, privacy, plans, handoff
 ```
+
+## Setup (web hub)
+
+Prerequisites: Node.js 24+ (`.nvmrc`), a Supabase project.
+
+```bash
+npm install
+cp .env.example .env.local   # fill in values (see below)
+npm run dev                  # http://localhost:3000
+```
+
+Without Supabase server keys the API falls back to an **in-memory dev store** —
+the app runs, but nothing persists. Apply the DB schema with
+`scripts/apply-schema.mjs` (needs `POSTGRES_URL_NON_POOLING`) to persist.
+
+### Environment variables (`.env.example`)
+
+| Var | Purpose |
+|---|---|
+| `NEXT_PUBLIC_APP_URL` | Public base URL (share links) |
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL (client) |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` *(or `…_ANON_KEY`)* | Public client/auth key |
+| `SUPABASE_URL` | Supabase URL (server) |
+| `SUPABASE_SECRET_KEY` *(or `SUPABASE_SERVICE_ROLE_KEY`)* | Privileged server key — never exposed to the browser |
+| `GROQ_API_KEY` / `OPENAI_API_KEY` / `GEMINI_API_KEY` | **Optional** AI wording (precedence Groq→OpenAI→Gemini). Verdict is always rules-based. |
 
 ## Commands
 
 ```bash
-npm run dev    # Start dev server
-npm run build  # Production build
-npm run lint   # ESLint check
-npm run typecheck # TypeScript check
-npm run check  # Run lint + typecheck + build
+npm run dev        # dev server
+npm run build      # production build
+npm run lint       # ESLint
+npm run typecheck  # tsc --noEmit
+npm run check      # lint + typecheck + build
 ```
 
-### If using docker
+## Chrome extension
+
+Plain, unbundled MV3 — **no build step**.
+
+1. `chrome://extensions` → enable **Developer mode**.
+2. **Load unpacked** → select the [`extension/`](extension/) folder.
+3. Config: [`extension/config.js`](extension/config.js) (`WEB_APP_URL`) and
+   [`extension/supabase.js`](extension/supabase.js) (same Supabase project).
+
+See [`extension/README.md`](extension/README.md). The popup shows your status
+ring, tab/switch/active-time stats, an **Open Dashboard** button, and a privacy
+note. (Contract note: the extension currently writes directly to Supabase rather
+than `POST /api/scans` — migration is tracked in the handoff.)
+
+## iOS app
+
+SwiftUI app in [`ios/Custod/`](ios/Custod). Account-first; shares the Supabase
+account with every other client. Screen Time capture needs Apple's Family
+Controls entitlement (pending). Run: `open ios/Custod/Custod.xcodeproj` → ⌘R.
+Status & roadmap: [`docs/IOS_PLAN.md`](docs/IOS_PLAN.md).
+
+## macOS app
+
+SwiftUI menu-bar app in [`macos/Custod/`](macos/Custod) — the most complete
+native client. Monitors on-device signals, scores burnout locally, and syncs
+checks to `POST /api/scans`. Build:
 
 ```bash
-docker compose up app --build # build and run the app
-docker compose up dev --build # run the app in dev mode on port 3001
+cd macos/Custod
+xcodebuild -project Custodt.xcodeproj -scheme Custodt \
+  -destination 'platform=macOS' build CODE_SIGNING_ALLOWED=NO
 ```
 
-## Updating for Other Platforms
+Status & roadmap: [`docs/MACOS_PLAN.md`](docs/MACOS_PLAN.md).
 
-Two source-of-truth files power all platform support. Edit the source, then run the sync script:
+## Backend API
 
-| What                   | Source of truth                         | Sync command                       |
-| ---------------------- | --------------------------------------- | ---------------------------------- |
-| Project instructions   | `AGENTS.md`                             | `bash scripts/sync-agent-rules.sh` |
-| `/clone-website` skill | `.claude/skills/clone-website/SKILL.md` | `node scripts/sync-skills.mjs`     |
+The web app is the shared backend for all clients. Full route map, request/
+response shapes, auth, and privacy notes: [`docs/API_CONTRACTS.md`](docs/API_CONTRACTS.md).
+Core: `POST /api/scans`, `GET /api/scans[/[id]]`, `/api/devices[/register]`,
+`/api/trends`, `/api/me/{progress,privacy,data}`, `/api/share[/[slug]]`,
+`/api/export`.
 
-Each script regenerates the platform-specific copies automatically. Agents that read the source files natively need no regeneration.
+## Legal & support pages
 
+- [`/privacy`](src/app/privacy/page.tsx) — what Custod analyzes and never collects.
+- [`/terms`](src/app/terms/page.tsx) — wellness/productivity insights, not medical advice.
+- [`/support`](src/app/support/page.tsx) — privacy, support, bug report, data deletion/export.
 
-## Star History
+## Deployment
 
-[![Star History Chart](https://api.star-history.com/svg?repos=JCodesMore/ai-website-cloner-template&type=Date)](https://star-history.com/#JCodesMore/ai-website-cloner-template&Date)
+Deploys to **Vercel**. Set the env vars above in Project → Settings →
+Environment Variables (`NEXT_PUBLIC_APP_URL` = the production URL). The repo also
+ships a `Dockerfile` / `docker-compose.yml` for container deploys.
+
+## Design & docs
+
+- [`docs/DESIGN_SYSTEM.md`](docs/DESIGN_SYSTEM.md) — brand, tokens, status colors, states.
+- [`docs/PRIVACY_SAFETY.md`](docs/PRIVACY_SAFETY.md) — canonical privacy/safety copy.
+- [`docs/AGENT_HANDOFF.md`](docs/AGENT_HANDOFF.md) — what's done / what's next.
+
+## Known limitations
+
+- Persistence needs Supabase server keys + applied schema (else in-memory dev store).
+- Chrome extension uses a direct-Supabase data model, not yet `POST /api/scans`.
+- iOS Screen Time blocked on Apple's Family Controls entitlement.
+- macOS real screen-time reads need Full Disk Access + relaunch.
+
+## Contact
+
+Privacy, support, bug reports, and **data deletion / export** requests:
+**nihar.manchikalapudi@gmail.com**
 
 ## License
 
-MIT
+MIT — see [`LICENSE`](LICENSE).

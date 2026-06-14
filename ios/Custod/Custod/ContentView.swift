@@ -39,6 +39,34 @@ struct ContentView: View {
                         }
                     }
 
+                    card {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Label("Privacy & safety", systemImage: "lock.shield")
+                                .font(.system(.headline, design: .rounded))
+                            Text("Custod only analyzes safe signals like tab titles, URLs/domains, optional check-ins, and scan history. It never reads full page contents, keystrokes, screenshots, or private messages.")
+                                .font(.system(.subheadline, design: .rounded))
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                            Text("Custod is not a diagnosis, therapy, or crisis-support tool. It shows digital strain patterns and reset suggestions.")
+                                .font(.system(.footnote, design: .rounded))
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                            HStack(spacing: 16) {
+                                Link("Privacy", destination: CustodConfig.webAppURL.appendingPathComponent("privacy"))
+                                Link("Terms", destination: CustodConfig.webAppURL.appendingPathComponent("terms"))
+                                Link("Support", destination: CustodConfig.webAppURL.appendingPathComponent("support"))
+                            }
+                            .font(.system(.subheadline, design: .rounded).weight(.medium))
+                            .tint(Color.brand)
+                            .padding(.top, 2)
+                            if let mailto = URL(string: "mailto:\(CustodConfig.contactEmail)") {
+                                Link("Contact: \(CustodConfig.contactEmail)", destination: mailto)
+                                    .font(.system(.footnote, design: .rounded))
+                                    .tint(Color.brand)
+                            }
+                        }
+                    }
+
                     Button(role: .destructive) {
                         auth.signOut()
                     } label: {
