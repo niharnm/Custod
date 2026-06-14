@@ -40,6 +40,11 @@ function bindAuthUi() {
   });
   logoutBtn.addEventListener("click", onLogout);
   googleBtn.addEventListener("click", onGoogleSignIn);
+
+  const skip = document.getElementById("authSkip");
+  if (skip) skip.addEventListener("click", () => showApp(null));
+  const nudge = document.getElementById("nudgeSignIn");
+  if (nudge) nudge.addEventListener("click", showAuth);
 }
 
 function onGoogleSignIn() {
@@ -100,6 +105,15 @@ function showApp(email) {
   document.getElementById("appView").classList.remove("hidden");
   const emailEl = document.getElementById("userEmail");
   if (emailEl) emailEl.textContent = email || "";
+
+  // Signed out (local-only) shows a sign-in nudge and hides the log-out button;
+  // signed in shows the email + log out and hides the nudge.
+  const signedIn = !!email;
+  const nudge = document.getElementById("signinNudge");
+  if (nudge) nudge.classList.toggle("hidden", signedIn);
+  const logout = document.getElementById("logoutBtn");
+  if (logout) logout.classList.toggle("hidden", !signedIn);
+
   loadDashboard();
 }
 

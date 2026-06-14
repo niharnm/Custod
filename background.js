@@ -15,6 +15,7 @@ import {
   getAuthUserId,
   getAuthSession,
   getFromSupabase,
+  refreshAccessToken,
   ENDPOINTS
 } from "./supabase.js";
 
@@ -220,7 +221,7 @@ function registerAlarms() {
   chrome.alarms.create("activityTick", { periodInMinutes: 1 });
 }
 
-chrome.runtime.onInstalled.addListener(() => {
+chrome.runtime.onInstalled.addListener((details) => {
   sessionStart = Date.now();
   lastDistractionMs = null;
   frustrationCount = 0;
@@ -228,7 +229,26 @@ chrome.runtime.onInstalled.addListener(() => {
   persistVolatile();
   registerAlarms();
   collectAndScore();
+  // On a fresh install, open the welcome tab so the user is asked to sign in
+  // right away (Grammarly-style), unless they've already onboarded.
+  if (details.reason === "install") {
+    maybeOpenWelcome();
+  }
 });
+
+// Open the first-run welcome/sign-in page once. Skips if the user already has a
+// session or has chosen to continue without an account.
+async function maybeOpenWelcome() {
+  try {
+    const stored = await chrome.storage.local.get("onboarded");
+    if (stored.onboarded) return;
+    const token = await getValidAccessToken();
+    if (token) return;
+    chrome.tabs.create({ url: chrome.runtime.getURL("welcome.html") });
+  } catch (_) {
+    chrome.tabs.create({ url: chrome.runtime.getURL("welcome.html") });
+  }
+}
 
 chrome.runtime.onStartup.addListener(async () => {
   sessionStart = Date.now();
@@ -444,6 +464,7 @@ async function clearLocalHourlySession() {
 }
 
 async function onAuthSignedIn() {
+  await chrome.storage.local.set({ onboarded: true });
   await ensureHourlySession();
 }
 
@@ -795,6 +816,34 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         email: session && session.user ? session.user.email : null
       });
     });
+    return true;
+  }
+
+  // Session handed over from the website via the content-script bridge. We
+  // validate it by exchanging the refresh token with Supabase before adopting,
+  // so an arbitrary page can't sign the user into a forged account.
+  if (msg.type === "external_session") {
+    (async () => {
+      if (!msg.refresh_token) {
+        sendResponse({ ok: false });
+        return;
+      }
+      const refreshed = await refreshAccessToken(msg.refresh_token);
+      if (refreshed && refreshed.ok) {
+        await chrome.storage.local.set({ onboarded: true });
+        await onAuthSignedIn();
+        sendResponse({ ok: true });
+      } else {
+        sendResponse({ ok: false });
+      }
+    })();
+    return true;
+  }
+
+  // "Continue without an account" from the welcome page — remember the choice
+  // so install doesn't keep reopening the welcome tab. Scoring stays local.
+  if (msg.type === "skip_onboarding") {
+    chrome.storage.local.set({ onboarded: true }).then(() => sendResponse({ ok: true }));
     return true;
   }
 
