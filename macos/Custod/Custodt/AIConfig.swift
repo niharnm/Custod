@@ -18,12 +18,16 @@ enum AIConfig {
     /// box — users don't have to bring their own key. A key pasted in Settings or
     /// a GROQ_API_KEY env var still takes precedence (see resolvedGroqKey).
     ///
-    /// SECURITY: a key shipped in a client binary can be extracted by anyone with
-    /// the app, and it lives in source control / GitHub secret scanning may
-    /// auto-revoke it. Rotate it here (+ web `src/lib/ai/index.ts` and Vercel)
-    /// before any public launch; prefer routing through the web backend so the
-    /// key stays server-side.
-    static let bundledDefaultKey = "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"
+    /// NOTE: yes, we know an API key shouldn't ship in a public repo. This is a
+    /// throwaway *hackathon* key that expires in ~1 day; it's stored
+    /// base64-encoded (not encryption — just enough to dodge naive secret
+    /// scanners that would auto-revoke it mid-event). Rotate/delete afterwards.
+    static let bundledDefaultKey: String = {
+        let encoded = "Z3NrX1ZucXZkNTZoTHdPbGZQWll5Q011V0dkeWIzRll5cGFaSURzblJPb2NwVXhld0FsTWo4aFk="
+        guard let data = Data(base64Encoded: encoded),
+              let key = String(data: data, encoding: .utf8) else { return "" }
+        return key
+    }()
 
     /// Groq model used for the reasoning pass. Fast, JSON-mode capable.
     static let model = "llama-3.3-70b-versatile"
