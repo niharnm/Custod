@@ -30,13 +30,13 @@ function formatWhen(iso: string): string {
     " · " + d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
 }
 
-const SIGNALS = [
-  { label: "Tab overload", hint: "How many open loops you're carrying" },
-  { label: "Context switching", hint: "How many modes you're juggling" },
-  { label: "Distraction pull", hint: "Entertainment mixed with work" },
-  { label: "Goal fragmentation", hint: "Competing tasks open at once" },
-  { label: "Time pressure", hint: "Deadlines and urgency" },
-  { label: "Recovery signal", hint: "Signs you're already resetting" },
+const SIGNALS: { label: string; hint: string; key: keyof Scan["riskBreakdown"] }[] = [
+  { label: "Tab overload", hint: "How many open loops you're carrying", key: "tabOverload" },
+  { label: "Context switching", hint: "How many modes you're juggling", key: "contextSwitching" },
+  { label: "Distraction pull", hint: "Entertainment mixed with work", key: "distractionPull" },
+  { label: "Goal fragmentation", hint: "Competing tasks open at once", key: "goalFragmentation" },
+  { label: "Time pressure", hint: "Deadlines and urgency", key: "timePressure" },
+  { label: "Recovery signal", hint: "Signs you're already resetting", key: "recoverySignal" },
 ];
 
 const NAV = [
@@ -199,17 +199,37 @@ export default function DashboardPage() {
 
           {/* Signals */}
           <section className="mt-6 rounded-3xl border border-[#e2e8f0] bg-white p-6">
-            <h2 className="text-lg font-semibold">The six signals Custod tracks</h2>
+            <div className="flex items-baseline justify-between">
+              <h2 className="text-lg font-semibold">The six signals Custod tracks</h2>
+              {latest ? (
+                <span className="text-xs text-custod-muted">from your latest check</span>
+              ) : null}
+            </div>
             <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {SIGNALS.map((s) => (
-                <div key={s.label} className="rounded-2xl bg-[#f6f8f7] p-4">
-                  <p className="text-sm font-medium">{s.label}</p>
-                  <p className="mt-1 text-xs text-custod-muted">{s.hint}</p>
-                  <div className="mt-3 h-1.5 rounded-full bg-[#e2e8f0]">
-                    <div className="h-1.5 w-0 rounded-full bg-custod-primary" />
+              {SIGNALS.map((s) => {
+                const value = latest ? Math.max(0, Math.min(100, Number(latest.riskBreakdown?.[s.key] ?? 0))) : 0;
+                // Recovery is a good signal; the rest are strain, so color them by load.
+                const isRecovery = s.key === "recoverySignal";
+                const bar = isRecovery
+                  ? "bg-custod-status-green"
+                  : value >= 66
+                    ? "bg-red-500"
+                    : value >= 33
+                      ? "bg-amber-400"
+                      : "bg-custod-primary";
+                return (
+                  <div key={s.label} className="rounded-2xl bg-[#f6f8f7] p-4">
+                    <div className="flex items-baseline justify-between">
+                      <p className="text-sm font-medium">{s.label}</p>
+                      {latest ? <span className="text-xs font-semibold tabular-nums text-custod-muted">{value}</span> : null}
+                    </div>
+                    <p className="mt-1 text-xs text-custod-muted">{s.hint}</p>
+                    <div className="mt-3 h-1.5 rounded-full bg-[#e2e8f0]">
+                      <div className={`h-1.5 rounded-full transition-all ${bar}`} style={{ width: `${value}%` }} />
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </section>
 
