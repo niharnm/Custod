@@ -33,7 +33,8 @@ src/                  # Next.js 16 web app + dashboard + backend API (the hub)
   app/api/**          # Backend routes (scans, devices, trends, share, export…)
   app/{privacy,terms,support}/  # Legal + support pages
   lib/                # owner/auth, scoring, ai wording, storage, validation
-extension/            # Chrome/MV3 extension (passive tab-pattern monitor)
+extension/            # Chrome/MV3 extension (tab-pattern monitor + desk-device portal)
+arduino/              # Custod desk-sensor firmware (pairs only via the extension)
 ios/Custod/           # SwiftUI iOS app (account-first; Screen Time pending)
 macos/Custod/         # SwiftUI macOS menu-bar app (most complete native client)
 supabase/             # DB schema / SQL
@@ -95,6 +96,15 @@ SwiftUI app in [`ios/Custod/`](ios/Custod). Account-first; shares the Supabase
 account with every other client. Screen Time capture needs Apple's Family
 Controls entitlement (pending). Run: `open ios/Custod/Custod.xcodeproj` → ⌘R.
 Status & roadmap: [`docs/IOS_PLAN.md`](docs/IOS_PLAN.md).
+
+## Desk device (Arduino)
+
+An optional hardware sensor (`arduino/`) that reads **ambient** desk signals —
+temperature, distance/posture, and light — and mirrors your live Custod status on
+an RGB lamp. It connects **only through the Chrome extension** over USB (Web
+Serial): popup → **Connect desk device** → portal tab. The macOS and iOS apps do
+not access it. Firmware, wiring, and the serial protocol are in
+[`arduino/README.md`](arduino/README.md).
 
 ## macOS app
 

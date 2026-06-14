@@ -318,6 +318,34 @@ body {
   margin: 0 16px 8px;
 }
 
+/* Desk device (Arduino) portal launcher */
+.device-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  width: calc(100% - 32px);
+  margin: 4px 16px 10px;
+  padding: 9px 12px;
+  border: 0.5px solid var(--border);
+  border-radius: 8px;
+  background: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  color: #1a1a1a;
+  cursor: pointer;
+}
+.device-btn:hover {
+  background: #f5f5f5;
+}
+.device-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 6px var(--green);
+}
+
 /* Privacy */
 .privacy {
   font-size: 10px;

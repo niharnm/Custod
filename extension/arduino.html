@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="arduino.css" />
+    <title>Custod — Desk device</title>
+  </head>
+  <body>
+    <main class="wrap">
+      <header class="head">
+        <span class="brand"><img src="icons/logo.png" alt="" class="brand-logo" />Custod</span>
+        <span class="head-sub">Desk device</span>
+      </header>
+
+      <!-- Web Serial unsupported -->
+      <section id="unsupported" class="card warn hidden">
+        <h2>This browser can't talk to the device</h2>
+        <p>
+          The Custod desk sensor connects over USB using the Web Serial API, which
+          is available in Chrome, Edge, Brave, and Arc on desktop. Open this page
+          there to connect.
+        </p>
+      </section>
+
+      <!-- Connection -->
+      <section id="connectCard" class="card">
+        <div class="row">
+          <div>
+            <h2>Desk sensor</h2>
+            <p id="connState" class="muted">Not connected.</p>
+          </div>
+          <span id="connDot" class="dot off"></span>
+        </div>
+        <div class="actions">
+          <button id="connectBtn" type="button" class="btn primary">Connect device</button>
+          <button id="disconnectBtn" type="button" class="btn hidden">Disconnect</button>
+          <button id="buzzBtn" type="button" class="btn hidden" title="Send a short test buzz">Test buzzer</button>
+        </div>
+        <p class="hint">
+          Plug the Custod sensor into a USB port, click <strong>Connect device</strong>,
+          and pick the Arduino (often "USB Serial" / "CH340" / "Arduino Uno").
+        </p>
+      </section>
+
+      <!-- Mirrored Custod status -->
+      <section class="card">
+        <h2>Status mirrored to the device</h2>
+        <div class="status-row">
+          <span id="statusLamp" class="lamp green"></span>
+          <div>
+            <div id="statusScore" class="status-score">—</div>
+            <div id="statusLabel" class="muted">Waiting for a check…</div>
+          </div>
+        </div>
+        <p class="hint">
+          The desk light follows your live Custod status: green when stable, amber
+          when strained, red when at risk. Updates automatically.
+        </p>
+      </section>
+
+      <!-- Live readings -->
+      <section class="card">
+        <h2>Live readings</h2>
+        <div class="grid">
+          <div class="metric">
+            <div id="mTemp" class="metric-val">—</div>
+            <div class="metric-label">Desk temp (°C)</div>
+          </div>
+          <div class="metric">
+            <div id="mPosture" class="metric-val">—</div>
+            <div class="metric-label">Posture score</div>
+          </div>
+          <div class="metric">
+            <div id="mDist" class="metric-val">—</div>
+            <div class="metric-label">Distance (cm)</div>
+          </div>
+          <div class="metric">
+            <div id="mLight" class="metric-val">—</div>
+            <div class="metric-label">Light level</div>
+          </div>
+        </div>
+        <p id="darkRoom" class="hint hidden">🌙 Dark room detected — consider some light to ease eye strain.</p>
+      </section>
+
+      <p class="privacy">
+        The desk sensor reads only ambient signals — temperature, distance
+        (posture), and light. No microphone, no camera, no page or app data. It
+        connects only over USB through this extension; the macOS and iOS apps
+        never access it. Privacy &amp; safety: Custod shows digital-strain
+        patterns and reset suggestions — it is not a diagnosis or therapy tool.
+      </p>
+    </main>
+
+    <script src="arduino.js"></script>
+  </body>
+</html>

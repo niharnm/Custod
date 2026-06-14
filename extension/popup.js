@@ -53,6 +53,16 @@ function bindAuthUi() {
       chrome.tabs.create({ url: DASHBOARD_URL });
     });
   }
+
+  // The Custod desk device (Arduino) connects ONLY through this extension, via
+  // the Web Serial API. Web Serial needs a persistent page + user gesture, which
+  // a popup can't provide (it closes on blur), so we open the portal in a tab.
+  const device = document.getElementById("openDevice");
+  if (device) {
+    device.addEventListener("click", () => {
+      chrome.tabs.create({ url: chrome.runtime.getURL("arduino.html") });
+    });
+  }
 }
 
 function onGoogleSignIn() {

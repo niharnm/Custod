@@ -48,7 +48,16 @@ and hit **Reload** on the extension card.
 | `supabase.js` | Supabase auth + REST client (shared account) |
 | `welcome.html/.js` | First-run sign-in onboarding |
 | `reset.html` | Focus-reset overlay page |
+| `arduino.html/.css/.js` | Desk-device (Arduino) connection portal — Web Serial |
 | `config.js` | Web app URL config |
+
+## Desk device (Arduino)
+
+The Custod desk sensor pairs **only through this extension**, over USB via the
+Web Serial API. The popup's **Connect desk device** button opens `arduino.html`
+in a tab (a popup can't hold a serial port open), which reads the device's live
+readings and mirrors your burnout status to its RGB lamp. The macOS and iOS apps
+never connect to it. Firmware + protocol: [`../arduino/README.md`](../arduino/README.md).
 
 ## Known gap (see docs/API_CONTRACTS.md)
 
