@@ -11,26 +11,54 @@
   const WEB_SOURCE = "custod-web";
   const AUTH_SESSION = "CUSTOD_AUTH_SESSION";
   const AUTH_SESSION_ACK = "CUSTOD_AUTH_SESSION_ACK";
+  const RUN_CHECK = "CUSTOD_RUN_CHECK";
+  const RUN_CHECK_RESULT = "CUSTOD_RUN_CHECK_RESULT";
 
   window.addEventListener("message", (event) => {
     if (event.source !== window) return;
     const data = event.data;
-    if (!data || data.source !== WEB_SOURCE || data.type !== AUTH_SESSION) return;
-    if (!data.access_token || !data.refresh_token) return;
+    if (!data || data.source !== WEB_SOURCE) return;
 
-    chrome.runtime.sendMessage(
-      {
-        type: "external_session",
-        access_token: data.access_token,
-        refresh_token: data.refresh_token
-      },
-      (res) => {
-        const ok = !chrome.runtime.lastError && res && res.ok;
-        window.postMessage(
-          { source: EXTENSION_SOURCE, type: AUTH_SESSION_ACK, ok: !!ok },
-          event.origin
-        );
-      }
-    );
+    if (data.type === AUTH_SESSION) {
+      if (!data.access_token || !data.refresh_token) return;
+      chrome.runtime.sendMessage(
+        {
+          type: "external_session",
+          access_token: data.access_token,
+          refresh_token: data.refresh_token
+        },
+        (res) => {
+          const ok = !chrome.runtime.lastError && res && res.ok;
+          window.postMessage(
+            { source: EXTENSION_SOURCE, type: AUTH_SESSION_ACK, ok: !!ok },
+            event.origin
+          );
+        }
+      );
+      return;
+    }
+
+    if (data.type === RUN_CHECK) {
+      chrome.runtime.sendMessage(
+        {
+          type: "external_run_check",
+          refresh_token: data.refresh_token
+        },
+        (res) => {
+          const ok = !chrome.runtime.lastError && res && res.ok;
+          window.postMessage(
+            {
+              source: EXTENSION_SOURCE,
+              type: RUN_CHECK_RESULT,
+              requestId: data.requestId,
+              ok: !!ok,
+              error: ok ? null : (res && res.error) || "extension_unavailable",
+              scan: ok ? res.scan : null
+            },
+            event.origin
+          );
+        }
+      );
+    }
   });
 })();

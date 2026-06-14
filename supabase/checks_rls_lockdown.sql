@@ -1,4 +1,4 @@
--- Lock down the legacy public.checks table used by the current Next.js API routes.
+-- Lock down the legacy public.checks table used by pre-scans compatibility routes.
 --
 -- Context:
 -- Supabase security advisors flagged unrestricted INSERT/UPDATE policies on
@@ -15,8 +15,15 @@ drop policy if exists "public insert" on public.checks;
 drop policy if exists "public update" on public.checks;
 drop policy if exists "public select" on public.checks;
 drop policy if exists "public delete" on public.checks;
+drop policy if exists "service role only" on public.checks;
 
 revoke all on table public.checks from anon;
 revoke all on table public.checks from authenticated;
 
 grant select, insert, update, delete on table public.checks to service_role;
+
+create policy "service role only" on public.checks
+  for all
+  to service_role
+  using (true)
+  with check (true);

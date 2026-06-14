@@ -24,6 +24,20 @@ import { TrendView } from "@/components/dashboard/TrendView";
 import { SettingsView } from "@/components/dashboard/SettingsView";
 
 type View = "overview" | "trend" | "settings";
+type RunCheckState = "idle" | "running" | "error";
+
+const EXTENSION_SOURCE = "custod-extension";
+const WEB_SOURCE = "custod-web";
+const RUN_CHECK = "CUSTOD_RUN_CHECK";
+const RUN_CHECK_RESULT = "CUSTOD_RUN_CHECK_RESULT";
+
+type ExtensionRunCheckMessage = {
+  source?: string;
+  type?: string;
+  requestId?: string;
+  ok?: boolean;
+  error?: string | null;
+};
 
 const PLATFORM_ICON: Record<string, React.ComponentType<{ className?: string }>> = {
   chrome: Puzzle,
@@ -72,6 +86,7 @@ export default function DashboardPage() {
   const [view, setView] = useState<View>("overview");
   const [devices, setDevices] = useState<Device[]>([]);
   const [selectedDevice, setSelectedDevice] = useState<string | null>(null); // null = all devices combined
+  const [runCheckState, setRunCheckState] = useState<RunCheckState>("idle");
   // When auth isn't configured, show the preview shell immediately.
   const [ready, setReady] = useState(!isSupabaseConfigured);
 
@@ -126,6 +141,92 @@ export default function DashboardPage() {
       active = false;
     };
   }, [ready, selectedDevice]);
+
+  async function refreshScansAndDevices() {
+    const q = selectedDevice
+      ? `/api/scans?limit=20&device=${encodeURIComponent(selectedDevice)}`
+      : "/api/scans?limit=20";
+    const [scanRes, devRes, progRes] = await Promise.all([
+      apiFetch(q),
+      apiFetch("/api/devices"),
+      apiFetch("/api/me/progress"),
+    ]);
+    const scanJson = await scanRes.json().catch(() => ({ scans: [] }));
+    const devJson = await devRes.json().catch(() => ({ devices: [] }));
+    const progJson = await progRes.json().catch(() => ({}));
+    if (Array.isArray(scanJson.scans)) setScans(scanJson.scans as Scan[]);
+    if (Array.isArray(devJson.devices)) setDevices(devJson.devices as Device[]);
+    const checkinStreak = progJson?.streaks?.find?.((s: { type?: string; current?: number }) => s.type === "checkin");
+    if (checkinStreak?.current) setStreak(Number(checkinStreak.current));
+  }
+
+  function requestExtensionCheck(refreshToken: string) {
+    return new Promise<void>((resolve, reject) => {
+      const requestId = window.crypto?.randomUUID?.() ?? String(Date.now());
+      const timer = window.setTimeout(() => {
+        window.removeEventListener("message", onMessage);
+        reject(new Error("extension_unavailable"));
+      }, 2500);
+
+      function onMessage(event: MessageEvent<ExtensionRunCheckMessage>) {
+        if (event.source !== window) return;
+        const data = event.data;
+        if (
+          data?.source !== EXTENSION_SOURCE ||
+          data.type !== RUN_CHECK_RESULT ||
+          data.requestId !== requestId
+        ) {
+          return;
+        }
+        window.clearTimeout(timer);
+        window.removeEventListener("message", onMessage);
+        if (data.ok) {
+          resolve();
+        } else {
+          reject(new Error(data.error || "scan_failed"));
+        }
+      }
+
+      window.addEventListener("message", onMessage);
+      window.postMessage(
+        {
+          source: WEB_SOURCE,
+          type: RUN_CHECK,
+          requestId,
+          refresh_token: refreshToken,
+        },
+        window.location.origin
+      );
+    });
+  }
+
+  async function runExtensionCheck() {
+    if (runCheckState === "running") return;
+    setRunCheckState("running");
+    try {
+      const supabase = getSupabaseBrowser();
+      const { data } = await supabase.auth.getSession();
+      const refreshToken = data.session?.refresh_token;
+      if (!refreshToken) {
+        router.push("/extension/connect");
+        return;
+      }
+      await requestExtensionCheck(refreshToken);
+      await refreshScansAndDevices();
+      setRunCheckState("idle");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "";
+      if (message === "extension_unavailable") {
+        router.push(LINKS.chromeExtension);
+        return;
+      }
+      if (message === "not_signed_in") {
+        router.push("/extension/connect");
+        return;
+      }
+      setRunCheckState("error");
+    }
+  }
 
   const deviceById = new Map(devices.map((d) => [d.id, d]));
   const latest = scans[0];
@@ -222,15 +323,23 @@ export default function DashboardPage() {
                   ))}
                 </select>
               </div>
-              <Link
-                href={LINKS.chromeExtension}
+              <button
+                type="button"
+                onClick={runExtensionCheck}
+                disabled={runCheckState === "running"}
                 className="custod-primary-button inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium text-white"
               >
                 <Puzzle className="size-4" />
-                Run a new check
-              </Link>
+                {runCheckState === "running" ? "Checking..." : "Run a new check"}
+              </button>
             </div>
           </header>
+
+          {runCheckState === "error" ? (
+            <p className="mt-3 text-xs font-medium text-red-600">
+              Could not run a check from the extension. Open the extension and try again.
+            </p>
+          ) : null}
 
           {devices.length > 0 ? (
             <p className="mt-3 text-xs text-custod-muted">

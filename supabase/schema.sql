@@ -46,7 +46,9 @@ create table if not exists scans (
   domain_count  int  not null default 0,
   goal          text,                       -- short; treat as sensitive
   mood_check_in text check (mood_check_in in ('calm','stressed','overwhelmed','numb','skip')),
-  time_remaining text
+  time_remaining text,
+  analysis      jsonb not null default '{}'::jsonb,
+  tab_groups    jsonb not null default '[]'::jsonb
 );
 create index if not exists idx_scans_user_created   on scans(user_id, created_at desc);
 create index if not exists idx_scans_device_created on scans(device_id, created_at desc);
@@ -103,6 +105,7 @@ create table if not exists reflections (
   id          uuid primary key default gen_random_uuid(),
   scan_id     uuid references scans(id) on delete cascade,
   user_id     uuid references profiles(id) on delete cascade,
+  metadata    jsonb not null default '{}'::jsonb,
   text        text not null,
   created_at  timestamptz not null default now()
 );
@@ -145,6 +148,7 @@ create table if not exists share_links (
   slug              text primary key,
   scan_id           uuid not null references scans(id) on delete cascade,
   user_id           uuid references profiles(id) on delete cascade,
+  device_id         uuid references devices(id) on delete set null,
   created_at        timestamptz not null default now(),
   expires_at        timestamptz,
   revoked_at        timestamptz,

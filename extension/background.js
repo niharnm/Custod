@@ -18,9 +18,11 @@ import {
   refreshAccessToken,
   ENDPOINTS
 } from "./supabase.js";
+import { WEB_APP_URL } from "./config.js";
 
 const HOUR_MS = 60 * 60 * 1000;
 const VISIT_DEDUPE_MS = 30 * 1000;
+const DEVICE_STORAGE_KEY = "custodDeviceId";
 
 const DISTRACTION_DOMAINS = [
   "youtube.com",
@@ -226,6 +228,94 @@ function isTrackableUrl(url) {
     url.startsWith("edge://") ||
     url.startsWith("devtools://")
   );
+}
+
+async function getDeviceId() {
+  const stored = await chrome.storage.local.get(DEVICE_STORAGE_KEY);
+  if (typeof stored[DEVICE_STORAGE_KEY] === "string" && stored[DEVICE_STORAGE_KEY]) {
+    return stored[DEVICE_STORAGE_KEY];
+  }
+  const id =
+    crypto.randomUUID?.() ??
+    `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
+  await chrome.storage.local.set({ [DEVICE_STORAGE_KEY]: id });
+  return id;
+}
+
+function tabsForScan(tabs) {
+  return tabs
+    .filter((tab) => isTrackableUrl(tab.url || tab.pendingUrl || ""))
+    .map((tab) => ({
+      id: typeof tab.id === "number" ? tab.id : undefined,
+      title: tab.title || "",
+      url: stripQueryAndHash(tab.url || tab.pendingUrl || ""),
+      active: Boolean(tab.active),
+      favIconUrl: tab.favIconUrl ? stripQueryAndHash(tab.favIconUrl) : undefined
+    }))
+    .slice(0, 200);
+}
+
+async function postWebApp(path, payload, token, deviceId) {
+  const res = await fetch(WEB_APP_URL + path, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: "Bearer " + token,
+      "X-Custod-Device": deviceId,
+      "Idempotency-Key": crypto.randomUUID?.() ?? String(Date.now())
+    },
+    body: JSON.stringify(payload)
+  });
+  const text = await res.text();
+  let body = null;
+  if (text) {
+    try {
+      body = JSON.parse(text);
+    } catch (_) {
+      body = { error: text };
+    }
+  }
+  if (!res.ok) {
+    const message = (body && (body.error || body.message)) || "Custod web app request failed.";
+    throw new Error(message);
+  }
+  return body;
+}
+
+async function registerWebAppDevice(token, deviceId) {
+  try {
+    await postWebApp(
+      "/api/devices/register",
+      { deviceId, platform: "chrome", label: "Chrome extension" },
+      token,
+      deviceId
+    );
+  } catch (err) {
+    console.warn("[Custod] device registration failed:", err && err.message);
+  }
+}
+
+async function createWebAppScan(tabs) {
+  const token = await getValidAccessToken();
+  if (!token) return { ok: false, error: "not_signed_in" };
+
+  const scanTabs = tabsForScan(tabs);
+  if (!scanTabs.length) return { ok: false, error: "no_tabs" };
+
+  const deviceId = await getDeviceId();
+  await registerWebAppDevice(token, deviceId);
+  const scan = await postWebApp("/api/scans", { tabs: scanTabs, deviceId }, token, deviceId);
+  return { ok: true, scan };
+}
+
+async function tabsForSender(sender) {
+  const windowId = sender && sender.tab && typeof sender.tab.windowId === "number"
+    ? sender.tab.windowId
+    : undefined;
+  if (typeof windowId === "number") {
+    return chrome.tabs.query({ windowId });
+  }
+  return chrome.tabs.query({ currentWindow: true });
 }
 
 function registerAlarms() {
@@ -858,6 +948,34 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
 
+  // Triggered by the dashboard through bridge.js. If the website supplies the
+  // current refresh token, validate/adopt it first so the scan lands on the
+  // same account as the dashboard.
+  if (msg.type === "external_run_check") {
+    (async () => {
+      try {
+        if (msg.refresh_token) {
+          const refreshed = await refreshAccessToken(msg.refresh_token);
+          if (refreshed && refreshed.ok) {
+            await chrome.storage.local.set({ onboarded: true });
+            await onAuthSignedIn();
+          }
+        }
+        const tabs = await tabsForSender(sender);
+        const result = await createWebAppScan(tabs);
+        if (!result.ok) {
+          sendResponse(result);
+          return;
+        }
+        await collectAndScore();
+        sendResponse(result);
+      } catch (err) {
+        sendResponse({ ok: false, error: (err && err.message) || "scan_failed" });
+      }
+    })();
+    return true;
+  }
+
   // "Continue without an account" from the welcome page — remember the choice
   // so install doesn't keep reopening the welcome tab. Scoring stays local.
   if (msg.type === "skip_onboarding") {
@@ -938,7 +1056,16 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
 
   if (msg.type === "force_rescore") {
-    collectAndScore().then(() => sendResponse({ ok: true }));
+    (async () => {
+      try {
+        const tabs = await chrome.tabs.query({ currentWindow: true });
+        const result = await createWebAppScan(tabs);
+        await collectAndScore();
+        sendResponse(result.ok ? { ok: true } : result);
+      } catch (err) {
+        sendResponse({ ok: false, error: (err && err.message) || "scan_failed" });
+      }
+    })();
     return true;
   }
 });
