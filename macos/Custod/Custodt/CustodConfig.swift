@@ -10,10 +10,12 @@ import Foundation
 // in a client binary. The service-role / secret key is never here; only the web
 // server holds it.
 enum CustodConfig {
-    /// Base URL of the Custod web app / API. Override at runtime with the
-    /// CUSTOD_WEB_URL env var (handy for pointing a dev build at a deployed app).
+    /// Base URL of the Custod web app / API. Defaults to the live deployment so a
+    /// fresh checkout syncs out of the box; override at runtime with the
+    /// CUSTOD_WEB_URL env var (e.g. http://localhost:3000) to point a dev build at
+    /// a local server.
     static var webAppURL: URL {
-        envURL("CUSTOD_WEB_URL") ?? URL(string: "http://localhost:3000")!
+        envURL("CUSTOD_WEB_URL") ?? URL(string: "https://custod.vercel.app")!
     }
 
     /// Contact address for privacy, support, and data requests.
