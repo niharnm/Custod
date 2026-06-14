@@ -3,6 +3,7 @@
 import { Menu, X } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import type { AuthChangeEvent, Session } from "@supabase/supabase-js";
 import { NAV_LINKS } from "@/lib/custod-content";
 import { getSupabaseBrowser, isSupabaseConfigured } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
@@ -20,9 +21,10 @@ export function Header() {
   useEffect(() => {
     if (!isSupabaseConfigured) return;
     const supabase = getSupabaseBrowser();
-    if (!supabase) return;
-    supabase.auth.getSession().then(({ data }) => setSignedIn(Boolean(data.session)));
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) =>
+    supabase.auth
+      .getSession()
+      .then(({ data }: { data: { session: Session | null } }) => setSignedIn(Boolean(data.session)));
+    const { data: sub } = supabase.auth.onAuthStateChange((_event: AuthChangeEvent, session: Session | null) =>
       setSignedIn(Boolean(session)),
     );
     return () => sub.subscription.unsubscribe();
