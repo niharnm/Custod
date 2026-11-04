@@ -850,7 +850,7 @@ private struct SettingsView: View {
             if settings.aiReasoningEnabled {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Groq API key").font(.system(.caption, design: .rounded).weight(.semibold))
-                    SecureField(settings.resolvedGroqKey.isEmpty ? "Paste your Groq API key" : "Using bundled key — paste to override",
+                    SecureField(settings.resolvedGroqKey.isEmpty ? "Paste your Groq API key" : "Using GROQ_API_KEY from the environment — paste to override",
                                 text: $settings.groqAPIKeyOverride)
                         .textFieldStyle(.roundedBorder)
                         .font(.system(.caption, design: .monospaced))

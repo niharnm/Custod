@@ -203,8 +203,9 @@ final class AuthStore: NSObject, ObservableObject {
             base: CustodConfig.webAppURL,
             path: "api/me/claim",
             bearer: token,
-            body: ["deviceId": DeviceIdentity.current],
-            sendApiKey: false
+            body: [:],
+            sendApiKey: false,
+            extraHeaders: ["X-Custod-Device": DeviceIdentity.current]
         )
     }
 
@@ -283,7 +284,8 @@ final class AuthStore: NSObject, ObservableObject {
         path: String,
         bearer: String,
         body: [String: String],
-        sendApiKey: Bool = true
+        sendApiKey: Bool = true,
+        extraHeaders: [String: String] = [:]
     ) async throws {
         var request = URLRequest(url: base.appendingPathComponent(path))
         request.httpMethod = "POST"
@@ -291,6 +293,7 @@ final class AuthStore: NSObject, ObservableObject {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("Bearer \(bearer)", forHTTPHeaderField: "Authorization")
         if sendApiKey { request.setValue(CustodConfig.supabaseAnonKey, forHTTPHeaderField: "apikey") }
+        for (name, value) in extraHeaders { request.setValue(value, forHTTPHeaderField: name) }
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
         _ = try await URLSession.shared.data(for: request)
     }
