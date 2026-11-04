@@ -46,8 +46,7 @@ export async function claimAnonymousHistory(): Promise<void> {
   try {
     await fetch("/api/me/claim", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ deviceId: id }),
+      headers: { "Content-Type": "application/json", "X-Custod-Device": id },
     });
   } catch {
     // Non-fatal: history claim can be retried on the next sign-in.

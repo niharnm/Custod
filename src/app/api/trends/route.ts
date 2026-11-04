@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
 import { getScanStore } from "@/lib/storage/scans";
-import { resolveOwner } from "@/lib/owner";
+import { requireOwner, unauthorized } from "@/lib/owner";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
-  const owner = await resolveOwner(request);
+  const owner = await requireOwner(request);
+  if (!owner) return unauthorized();
   const scans = await getScanStore().listScans(owner, 500);
   const points = scans
     .slice()

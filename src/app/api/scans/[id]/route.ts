@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { scanToMarkdown } from "@/lib/privacy";
 import { getScanStore } from "@/lib/storage/scans";
-import { resolveOwner } from "@/lib/owner";
+import { requireOwner, unauthorized } from "@/lib/owner";
 
 export const dynamic = "force-dynamic";
 
@@ -11,7 +11,8 @@ export async function GET(
 ) {
   const { id } = await params;
   const url = new URL(request.url);
-  const owner = await resolveOwner(request);
+  const owner = await requireOwner(request);
+  if (!owner) return unauthorized();
   const scan = await getScanStore().getScan(id, owner);
   if (!scan) return NextResponse.json({ error: "Scan not found." }, { status: 404 });
 

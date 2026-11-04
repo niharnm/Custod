@@ -72,8 +72,21 @@ export function getScanStore(): ScanStore {
 
 // ── Owner helpers ───────────────────────────────────────────────────────────
 // Precedence: a signed-in user (userId) scopes by account; otherwise scope by
-// the anonymous deviceId. An empty owner matches everything (used for public
-// shared-scan reads).
+// the anonymous deviceId. An empty owner is NEVER valid for owner-scoped
+// operations: it fails closed (throws) instead of matching every row. Public
+// shared-scan reads go through getSharedScan, which does not use an owner.
+
+/** Thrown when an owner-scoped storage call is made without a user or device id. */
+export class OwnerRequiredError extends Error {
+  constructor() {
+    super("An authenticated user or device id is required.");
+    this.name = "OwnerRequiredError";
+  }
+}
+
+export function assertOwner(owner?: Owner): asserts owner is Owner {
+  if (!owner?.userId && !owner?.deviceId) throw new OwnerRequiredError();
+}
 
 function hasOwner(owner?: Owner): boolean {
   return Boolean(owner?.userId || owner?.deviceId);
@@ -90,7 +103,7 @@ function scanOwner(scan: Scan): Owner {
 }
 
 function ownsOwner(scan: Scan, owner?: Owner): boolean {
-  if (!hasOwner(owner)) return true;
+  if (!hasOwner(owner)) return false;
   if (owner?.userId) return scan.userId === owner.userId;
   return scan.deviceId === owner?.deviceId;
 }
@@ -120,6 +133,7 @@ class MemoryScanStore implements ScanStore {
   }
 
   async createScan(response: AnalyzeBurnoutResponse, owner?: Owner) {
+    assertOwner(owner);
     const scan = responseToScan(response, owner);
     this.scans.set(scan.id, scan);
     this.events.push(event("scan_created", scan.id, owner, { score: scan.score, status: scan.status }));
@@ -127,12 +141,14 @@ class MemoryScanStore implements ScanStore {
   }
 
   async getScan(id: string, owner?: Owner) {
+    assertOwner(owner);
     const scan = this.scans.get(id);
     if (!scan || !ownsOwner(scan, owner)) return null;
     return withReflection(scan, this.reflections.get(id));
   }
 
   async listScans(owner?: Owner, limit = 30, deviceFilter?: string) {
+    assertOwner(owner);
     return Array.from(this.scans.values())
       .filter((scan) => ownsOwner(scan, owner))
       .filter((scan) => (owner?.userId && deviceFilter ? scan.deviceId === deviceFilter : true))
@@ -188,13 +204,13 @@ class MemoryScanStore implements ScanStore {
   }
 
   async getEvents(owner?: Owner) {
-    if (!hasOwner(owner)) return this.events;
+    assertOwner(owner);
     return this.events.filter((item) => ownsOwner({ deviceId: item.deviceId, userId: item.userId } as Scan, owner));
   }
 
   async getPrivacy(owner?: Owner) {
+    assertOwner(owner);
     const key = ownerKey(owner);
-    if (!key) return DEFAULT_PRIVACY_SETTINGS;
     const settings = this.privacy.get(key) ?? DEFAULT_PRIVACY_SETTINGS;
     this.privacy.set(key, settings);
     return settings;
@@ -203,8 +219,7 @@ class MemoryScanStore implements ScanStore {
   async updatePrivacy(patch: Partial<PrivacySettings>, owner?: Owner) {
     const current = await this.getPrivacy(owner);
     const next = { ...current, ...patch };
-    const key = ownerKey(owner);
-    if (key) this.privacy.set(key, next);
+    this.privacy.set(ownerKey(owner), next);
     return next;
   }
 
@@ -226,9 +241,10 @@ class MemoryScanStore implements ScanStore {
   }
 
   async revokeShare(slug: string, owner?: Owner) {
+    assertOwner(owner);
     const share = this.shares.get(slug);
     if (!share) return false;
-    if (hasOwner(owner) && !ownsOwner({ userId: share.userId, deviceId: share.deviceId } as Scan, owner)) return false;
+    if (!ownsOwner({ userId: share.userId, deviceId: share.deviceId } as Scan, owner)) return false;
     this.shares.set(slug, { ...share, revokedAt: new Date().toISOString() });
     return true;
   }
@@ -244,6 +260,7 @@ class MemoryScanStore implements ScanStore {
   }
 
   async deleteData(owner?: Owner) {
+    assertOwner(owner);
     const scanIds = Array.from(this.scans.values())
       .filter((scan) => ownsOwner(scan, owner))
       .map((scan) => scan.id);
@@ -263,6 +280,7 @@ class MemoryScanStore implements ScanStore {
   }
 
   async claimDevice(userId: string, deviceId: string) {
+    if (!userId || !deviceId) throw new OwnerRequiredError();
     let claimed = 0;
     for (const [id, scan] of this.scans) {
       if (scan.deviceId === deviceId && !scan.userId) {
@@ -307,11 +325,14 @@ function isUuid(value?: string): boolean {
   return Boolean(value && UUID_RE.test(value));
 }
 
-/** Apply owner scoping to a query: user_id when signed in, else device_id. */
-function ownerEq(builder: DbBuilder, owner?: Owner): DbBuilder {
+/**
+ * Apply owner scoping to a query: user_id when signed in, else device_id.
+ * Fails closed: a missing owner throws rather than returning an unfiltered query.
+ */
+export function ownerEq(builder: DbBuilder, owner?: Owner): DbBuilder {
   if (owner?.userId) return builder.eq("user_id", owner.userId);
   if (owner?.deviceId) return builder.eq("device_id", owner.deviceId);
-  return builder;
+  throw new OwnerRequiredError();
 }
 
 class SupabaseScanStore implements ScanStore {
@@ -325,13 +346,18 @@ class SupabaseScanStore implements ScanStore {
     if (input.userId) {
       await query(this.supabase.from("profiles").upsert({ id: input.userId }, { onConflict: "id", ignoreDuplicates: true }));
     }
+    // Never let a register call re-parent or detach a device that already
+    // belongs to an account: keep the stored owner unless it is unclaimed.
+    const { data: existing } = await query(this.supabase.from("devices").select("id,user_id").eq("id", id).maybeSingle());
+    const existingUserId = (existing as DbRow | null)?.user_id as string | null | undefined;
+    const ownerUserId = existingUserId ?? input.userId ?? null;
     const row = {
       id,
-      user_id: input.userId ?? null,
+      user_id: ownerUserId,
       platform: input.platform,
       label: input.label ?? null,
       last_seen_at: now,
-      sync_enabled: Boolean(input.userId),
+      sync_enabled: Boolean(ownerUserId),
     };
     const { data, error } = await query(
       this.supabase.from("devices").upsert(row).select("*").maybeSingle()
@@ -364,6 +390,7 @@ class SupabaseScanStore implements ScanStore {
   }
 
   async createScan(response: AnalyzeBurnoutResponse, owner?: Owner) {
+    assertOwner(owner);
     const scan = responseToScan(response, owner);
     const aggregate = aggregateTabs(response.tabGroups.flatMap((group) => group.tabs));
     const { userId, deviceId } = await this.ensureRefs(owner);
@@ -479,7 +506,7 @@ class SupabaseScanStore implements ScanStore {
   }
 
   async getPrivacy(owner?: Owner) {
-    if (!hasOwner(owner)) return DEFAULT_PRIVACY_SETTINGS;
+    assertOwner(owner);
     const { data, error } = await query(
       ownerEq(this.supabase.from("privacy_settings").select("*"), owner).maybeSingle()
     );
@@ -488,7 +515,7 @@ class SupabaseScanStore implements ScanStore {
   }
 
   async updatePrivacy(patch: Partial<PrivacySettings>, owner?: Owner) {
-    if (!hasOwner(owner)) return { ...DEFAULT_PRIVACY_SETTINGS, ...patch };
+    assertOwner(owner);
     const row = privacyToRow({ ...(await this.getPrivacy(owner)), ...patch }, owner);
     const { data, error } = await query(this.supabase.from("privacy_settings").upsert(row).select("*").maybeSingle());
     if (error) throw new Error(error.message);
@@ -519,15 +546,23 @@ class SupabaseScanStore implements ScanStore {
     const { data, error } = await query(this.supabase.from("share_links").select("*").eq("slug", slug).maybeSingle());
     if (error) throw new Error(error.message);
     if (!data || data.revoked_at || (data.expires_at && new Date(data.expires_at).getTime() < Date.now())) return null;
-    const scan = await this.getScan(data.scan_id);
+    // Public read authorised by the share slug itself, so no owner scoping here.
+    const { data: scanRow, error: scanError } = await query(
+      this.supabase.from("scans").select("*").eq("id", data.scan_id).maybeSingle()
+    );
+    if (scanError) throw new Error(scanError.message);
+    const scan = scanRow ? rowToScan(scanRow) : null;
     return scan ? publicScan(scan, Boolean(data.include_raw_tabs)) : null;
   }
 
   async revokeShare(slug: string, owner?: Owner) {
-    const builder = ownerEq(this.supabase.from("share_links").update({ revoked_at: new Date().toISOString() }).eq("slug", slug), owner);
-    const { error } = await query(builder);
+    const builder = ownerEq(
+      this.supabase.from("share_links").update({ revoked_at: new Date().toISOString() }).eq("slug", slug),
+      owner
+    ).select("slug");
+    const { data, error } = await query(builder);
     if (error) throw new Error(error.message);
-    return true;
+    return ((data as DbRow[] | null)?.length ?? 0) > 0;
   }
 
   async exportData(owner?: Owner) {
@@ -541,6 +576,7 @@ class SupabaseScanStore implements ScanStore {
   }
 
   async deleteData(owner?: Owner) {
+    assertOwner(owner);
     const scans = await this.listScans(owner, 1000);
     const ids = scans.map((scan) => scan.id);
     if (ids.length) {
@@ -552,6 +588,7 @@ class SupabaseScanStore implements ScanStore {
   }
 
   async claimDevice(userId: string, deviceId: string) {
+    if (!userId || !deviceId) throw new OwnerRequiredError();
     // Re-parent the device's anonymous rows to the user (only rows not yet owned).
     const tables = ["scans", "scan_events", "share_links", "reflections", "privacy_settings", "devices"];
     let scans = 0;

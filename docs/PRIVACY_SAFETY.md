@@ -28,6 +28,25 @@ Use this in settings/about and the footer of the website.
 - Optional **check-ins** (mood, goal, time remaining) — only if the user shares them.
 - **Scan history**, to make trends and resets useful over time.
 
+## Optional AI wording (opt-in)
+
+By default the score, status, and reset plan come from an on-device/server rules
+engine and nothing is sent to an AI provider. AI wording only runs when it has
+been explicitly enabled: a `GROQ_API_KEY` (or OpenAI / Gemini key) is configured
+on the server, or, in the macOS app, the user turns on "AI reasoning" and
+provides a key. When enabled, Custod sends the scan's tab titles and URLs, the
+optional mood check-in, goal and time remaining, and the rules-engine result
+to the provider (Groq by default) to generate the explanation. Page contents are
+never sent. Any copy that says nothing leaves the device must carry this caveat.
+
+## Anonymous use and device IDs
+
+Without an account, scans are stored on Custod's servers keyed by a random
+device ID generated on that device. The data is not stored only on the device.
+Whoever holds the device ID can read that history, so it is treated as a secret
+and is only accepted in the `X-Custod-Device` header. Signing in claims the
+history of the device making the request onto the account.
+
 ## What Custod never collects
 
 - Full **page contents**.
