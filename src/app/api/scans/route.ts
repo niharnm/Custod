@@ -3,7 +3,7 @@ import { ZodError } from "zod";
 import { applyOptionalAiWording } from "@/lib/ai";
 import { analyzeWithRules } from "@/lib/scoring";
 import { getScanStore } from "@/lib/storage/scans";
-import { resolveOwner } from "@/lib/owner";
+import { requireOwner, unauthorized } from "@/lib/owner";
 import { analyzeBurnoutRequestSchema, zodErrorMessage } from "@/lib/validation/schemas";
 import { clientKey, getIdempotent, rateLimit, setIdempotent } from "@/lib/http-guards";
 import type { AnalyzeBurnoutResponse } from "@/lib/types";
@@ -20,13 +20,17 @@ export async function POST(request: Request) {
       );
     }
 
+    const owner = await requireOwner(request);
+    if (!owner) return unauthorized();
+
+    // Scope the idempotency cache to the caller so a guessed key cannot return another user's result.
     const idempotencyKey = request.headers.get("Idempotency-Key");
-    if (idempotencyKey) {
-      const cached = getIdempotent<AnalyzeBurnoutResponse>(`scans:${idempotencyKey}`);
+    const cacheKey = idempotencyKey ? `scans:${owner.userId ?? owner.deviceId}:${idempotencyKey}` : null;
+    if (cacheKey) {
+      const cached = getIdempotent<AnalyzeBurnoutResponse>(cacheKey);
       if (cached) return NextResponse.json(cached);
     }
 
-    const owner = await resolveOwner(request);
     const body = await request.json().catch(() => ({}));
     const parsed = analyzeBurnoutRequestSchema.parse({
       ...body,
@@ -41,7 +45,7 @@ export async function POST(request: Request) {
     const analysis = await applyOptionalAiWording(parsed, rules);
     await getScanStore().createScan(analysis, owner);
 
-    if (idempotencyKey) setIdempotent(`scans:${idempotencyKey}`, analysis);
+    if (cacheKey) setIdempotent(cacheKey, analysis);
 
     return NextResponse.json(analysis);
   } catch (error) {
@@ -58,7 +62,8 @@ export async function POST(request: Request) {
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const limit = Math.min(100, Math.max(1, Number(url.searchParams.get("limit") ?? 30)));
-  const owner = await resolveOwner(request);
+  const owner = await requireOwner(request);
+  if (!owner) return unauthorized();
   // Signed-in users can narrow to a single device with ?device=<id>; omitted = all devices combined.
   const deviceFilter = owner.userId ? url.searchParams.get("device") ?? undefined : undefined;
   const scans = await getScanStore().listScans(owner, limit, deviceFilter);

@@ -1,22 +1,14 @@
 import type { AnalyzeBurnoutRequest, AnalyzeBurnoutResponse } from "@/lib/types";
 import { z } from "zod";
 
-// Shared Groq key bundled with Custod so AI reasoning works out of the box —
-// no one has to bring their own key. `GROQ_API_KEY` in the environment always
-// takes precedence and is the right place to override/rotate without a code edit.
-//
-// NOTE: yes, we know an API key shouldn't sit in a public repo. This is a
-// throwaway *hackathon* key that expires in ~1 day; it's stored base64-encoded
-// (not encryption — just enough to dodge naive secret scanners that would
-// auto-revoke it mid-event). It's decoded only here, server-side, and never sent
-// to the browser/extension. Rotate or delete after the hackathon.
-const DEFAULT_GROQ_API_KEY = Buffer.from(
-  "Z3NrX1ZucXZkNTZoTHdPbGZQWll5Q011V0dkeWIzRll5cGFaSURzblJPb2NwVXhld0FsTWo4aFk=",
-  "base64",
-).toString("utf8");
-
-/** Resolved Groq key: environment override first, then the bundled default. */
-export const GROQ_API_KEY = process.env.GROQ_API_KEY || DEFAULT_GROQ_API_KEY;
+// AI wording is opt-in per deployment: it runs only when GROQ_API_KEY,
+// OPENAI_API_KEY or GEMINI_API_KEY is set in the server environment. With no key
+// configured nothing is sent to any provider and the deterministic rules wording
+// is used. No key is bundled with the source.
+/** Groq key from the environment, if any. Read lazily so tests and rotation work. */
+export function getGroqApiKey(): string | undefined {
+  return process.env.GROQ_API_KEY?.trim() || undefined;
+}
 
 const wordingSchema = z.object({
   oneSentenceExplanation: z.string().min(20).max(300),
@@ -58,7 +50,7 @@ async function analyzeWithAI(
   input: AnalyzeBurnoutRequest,
   rules: AnalyzeBurnoutResponse
 ): Promise<WordingResult | null> {
-  if (GROQ_API_KEY) return callGroq(input, rules);
+  if (getGroqApiKey()) return callGroq(input, rules);
   if (process.env.OPENAI_API_KEY) return callOpenAI(input, rules);
   if (process.env.GEMINI_API_KEY) return callGemini(input, rules);
   return null;
@@ -73,7 +65,7 @@ async function callGroq(input: AnalyzeBurnoutRequest, rules: AnalyzeBurnoutRespo
     const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${GROQ_API_KEY}`,
+        Authorization: `Bearer ${getGroqApiKey()}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({

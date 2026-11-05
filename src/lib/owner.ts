@@ -1,6 +1,7 @@
 import "server-only";
 
 import { createClient } from "@supabase/supabase-js";
+import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 
 // Lightweight client used only to verify a Bearer JWT via the Auth server.
@@ -34,22 +35,28 @@ function bearerToken(request: Request): string | null {
   return match ? match[1] : null;
 }
 
+const DEVICE_ID_RE = /^[A-Za-z0-9_-]{8,120}$/;
+
+/**
+ * The anonymous device id the client reports. Header only: ids in URLs leak
+ * through logs, referrers and history, so the `?deviceId=` query form is not
+ * accepted. Malformed values are ignored.
+ */
+export function deviceIdFromRequest(request: Request): string | undefined {
+  const raw = request.headers.get("X-Custod-Device")?.trim();
+  return raw && DEVICE_ID_RE.test(raw) ? raw : undefined;
+}
+
 /**
  * Resolve who is making this request, in priority order:
  *  1. `Authorization: Bearer <token>` → verify with Supabase admin (extension/macOS).
  *  2. Supabase session cookie → signed-in web user.
  *  3. `X-Custod-Device` header → anonymous device fallback.
+ * The result can be empty (no user, no device); owner-scoped routes must use
+ * `requireOwner` so an empty owner is rejected instead of matching every row.
  */
 export async function resolveOwner(request: Request): Promise<Owner> {
-  let deviceId = request.headers.get("X-Custod-Device") || undefined;
-  if (!deviceId) {
-    // Some GET routes pass the anonymous id as a query param instead of a header.
-    try {
-      deviceId = new URL(request.url).searchParams.get("deviceId") || undefined;
-    } catch {
-      // non-absolute URL; ignore
-    }
-  }
+  const deviceId = deviceIdFromRequest(request);
 
   // 1. Bearer token (cross-origin clients that can't send cookies).
   const token = bearerToken(request);
@@ -71,4 +78,14 @@ export async function resolveOwner(request: Request): Promise<Owner> {
 
   // 3. Anonymous device.
   return { deviceId };
+}
+
+/** Resolve the owner, or null when the request has neither a user nor a device id. */
+export async function requireOwner(request: Request): Promise<Owner | null> {
+  const owner = await resolveOwner(request);
+  return owner.userId || owner.deviceId ? owner : null;
+}
+
+export function unauthorized(): NextResponse {
+  return NextResponse.json({ error: "Sign in or send a device id to use this endpoint." }, { status: 401 });
 }

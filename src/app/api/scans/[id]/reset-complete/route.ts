@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 import { getScanStore } from "@/lib/storage/scans";
-import { resolveOwner } from "@/lib/owner";
+import { requireOwner, unauthorized } from "@/lib/owner";
 import { resetCompleteRequestSchema, zodErrorMessage } from "@/lib/validation/schemas";
 
 export const dynamic = "force-dynamic";
@@ -12,7 +12,8 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
-    const owner = await resolveOwner(request);
+    const owner = await requireOwner(request);
+    if (!owner) return unauthorized();
     const parsed = resetCompleteRequestSchema.parse(await request.json().catch(() => ({})));
     const progress = await getScanStore().completeReset(id, parsed.completedSteps, owner);
     if (!progress) return NextResponse.json({ error: "Scan not found." }, { status: 404 });

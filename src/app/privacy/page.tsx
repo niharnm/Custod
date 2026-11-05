@@ -47,8 +47,22 @@ export default function PrivacyPage() {
         <p>
           When you sign in, your scans are tied to your account so they can sync across the Chrome
           extension, macOS app, iOS app, and the web dashboard. Each install is identified by a
-          random device ID. You can use Custod without an account, in which case data stays scoped
-          to that single device.
+          random device ID. You can use Custod without an account. In that case your scans are still
+          stored on our servers, keyed by that device ID rather than an email, and are only
+          returned to requests that present the same ID. When you later sign in, history from
+          the device you sign in on can be merged into your account.
+        </p>
+      </LegalSection>
+
+      <LegalSection heading="Optional AI wording">
+        <p>
+          The score, status, and reset plan are computed by a rules engine. If AI wording is turned
+          on (a provider key is configured on the server, or you enable AI reasoning in the macOS
+          app and supply a key), Custod sends your scan&rsquo;s tab titles and URLs, any mood
+          check-in, goal, and time remaining you shared, and the rules result to the AI provider
+          (Groq by default; OpenAI or Google Gemini if configured instead) so it can write the
+          explanation. Page contents are never sent. If no key is configured, nothing is sent to
+          any AI provider.
         </p>
       </LegalSection>
 

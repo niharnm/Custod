@@ -64,7 +64,7 @@ the app runs, but nothing persists. Apply the DB schema with
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` *(or `…_ANON_KEY`)* | Public client/auth key |
 | `SUPABASE_URL` | Supabase URL (server) |
 | `SUPABASE_SECRET_KEY` *(or `SUPABASE_SERVICE_ROLE_KEY`)* | Privileged server key — never exposed to the browser |
-| `GROQ_API_KEY` / `OPENAI_API_KEY` / `GEMINI_API_KEY` | AI wording (precedence Groq→OpenAI→Gemini). A shared **Groq key is bundled**, so this works out of the box — set `GROQ_API_KEY` only to override/rotate. Verdict is always rules-based. |
+| `GROQ_API_KEY` / `OPENAI_API_KEY` / `GEMINI_API_KEY` | AI wording (precedence Groq→OpenAI→Gemini). **Opt-in:** no key is bundled; with none set nothing is sent to an AI provider. When set, tab titles, URLs and the optional mood/goal/time are sent to that provider. Verdict is always rules-based. |
 
 ## Commands
 

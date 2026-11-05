@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 import { getScanStore } from "@/lib/storage/scans";
-import { resolveOwner } from "@/lib/owner";
+import { requireOwner, unauthorized } from "@/lib/owner";
 import { shareRequestSchema, zodErrorMessage } from "@/lib/validation/schemas";
 import { clientKey, rateLimit } from "@/lib/http-guards";
 
@@ -16,7 +16,8 @@ export async function POST(request: Request) {
         { status: 429, headers: { "Retry-After": String(limited.retryAfter) } }
       );
     }
-    const owner = await resolveOwner(request);
+    const owner = await requireOwner(request);
+    if (!owner) return unauthorized();
     const parsed = shareRequestSchema.parse(await request.json().catch(() => ({})));
     const share = await getScanStore().createShare(parsed.scanId, parsed, owner);
     if (!share) return NextResponse.json({ error: "Scan not found." }, { status: 404 });

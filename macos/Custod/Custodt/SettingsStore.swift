@@ -86,7 +86,7 @@ final class SettingsStore: ObservableObject {
     /// fully local unless the user chooses otherwise.
     @Published var aiReasoningEnabled: Bool            { didSet { d.set(aiReasoningEnabled, forKey: Key.aiEnabled) } }
 
-    /// User-supplied Groq key. Empty means fall back to env / bundled default.
+    /// User-supplied Groq key. Empty means fall back to the env var; with neither, AI is off.
     @Published var groqAPIKeyOverride: String          { didSet { d.set(groqAPIKeyOverride, forKey: Key.groqKey) } }
 
     @Published private(set) var pinHash: String?       { didSet { d.set(pinHash, forKey: Key.pin) } }
@@ -110,24 +110,24 @@ final class SettingsStore: ObservableObject {
         let d = UserDefaults.standard
         interventionMode = InterventionMode(rawValue: d.string(forKey: Key.mode) ?? "") ?? .notify
         sensitivity = Sensitivity(rawValue: d.string(forKey: Key.sensitivity) ?? "") ?? .balanced
-        notificationsEnabled = d.object(forKey: Key.notifications) as? Bool ?? true
+        notificationsEnabled = d.object(forKey: Key.notifications) as? Bool ?? false
         supervisedMode = d.bool(forKey: Key.supervised)
         hasOnboarded = d.bool(forKey: Key.onboarded)
-        // Default ON; aiReasoningActive still gates on a key actually being
+        // Default OFF (opt-in); aiReasoningActive also gates on a key actually being
         // present, so nothing is sent until the user provides one (Settings or
         // GROQ_API_KEY). Users can turn it off to keep the app fully local.
-        aiReasoningEnabled = d.object(forKey: Key.aiEnabled) as? Bool ?? true
+        aiReasoningEnabled = d.object(forKey: Key.aiEnabled) as? Bool ?? false
         groqAPIKeyOverride = d.string(forKey: Key.groqKey) ?? ""
         pinHash = d.string(forKey: Key.pin)
     }
 
-    /// The Groq key to actually use: user override → env var → bundled default.
+    /// The Groq key to actually use: user override → env var.
     /// Empty string means "no key available".
     var resolvedGroqKey: String {
         let override = groqAPIKeyOverride.trimmingCharacters(in: .whitespacesAndNewlines)
         if !override.isEmpty { return override }
         if let env = AIConfig.environmentKey { return env }
-        return AIConfig.bundledDefaultKey
+        return ""
     }
 
     /// AI reasoning is usable only when the toggle is on and a key exists.

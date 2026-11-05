@@ -58,12 +58,9 @@ All extension JS passes `node --check`; `manifest.json` is valid.
 
 ### Flagged, deliberately NOT changed (teammate-owned, marked intentional)
 
-- **A real Groq secret is now hardcoded** in `src/lib/ai/index.ts`
-  (`DEFAULT_GROQ_API_KEY`) and `.env.example` so AI works out of the box. This
-  conflicts with the "no hardcoded secrets" rule but was committed intentionally
-  (`2c67c93`) and carries its own SECURITY comment. **Top remaining security
-  item: rotate it and move to a server-only env var before any public launch.**
-  It does not affect the deterministic fallback (numbers are always rules-based).
+- **Resolved:** the previously hardcoded Groq key was removed from the source
+  (web and macOS). AI wording now needs `GROQ_API_KEY` (or another provider key)
+  in the environment. The old key remains in git history and must be revoked.
 
 ### Commands run (this pass)
 
